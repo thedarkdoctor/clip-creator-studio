@@ -1,34 +1,89 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
+import { useAuth } from '@/contexts/AuthContext';
+import { usePlatforms, useUserProfile, useUpdateProfile, useSaveUserPlatforms, useUserPlatforms } from '@/hooks/useSupabaseData';
+import { useToast } from '@/hooks/use-toast';
 import { niches } from '@/data/mockData';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function BrandSetup() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  
+  const { data: platforms, isLoading: platformsLoading } = usePlatforms();
+  const { data: userProfile, isLoading: profileLoading } = useUserProfile();
+  const { data: userPlatforms } = useUserPlatforms();
+  const updateProfile = useUpdateProfile();
+  const saveUserPlatforms = useSaveUserPlatforms();
+  
   const [brandName, setBrandName] = useState('');
   const [niche, setNiche] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const togglePlatform = (platform: string) => {
-    setPlatforms((prev) =>
-      prev.includes(platform)
-        ? prev.filter((p) => p !== platform)
-        : [...prev, platform]
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Populate form with existing data
+  useEffect(() => {
+    if (userProfile) {
+      setBrandName(userProfile.brand_name || '');
+      setNiche(userProfile.niche || '');
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    if (userPlatforms) {
+      setSelectedPlatforms(userPlatforms.map((up) => up.platform_id));
+    }
+  }, [userPlatforms]);
+
+  const togglePlatform = (platformId: string) => {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platformId)
+        ? prev.filter((p) => p !== platformId)
+        : [...prev, platformId]
     );
   };
 
-  const isValid = brandName.trim() && niche && platforms.length > 0;
+  const isValid = brandName.trim() && niche && selectedPlatforms.length > 0;
 
-  const platformOptions = [
-    { id: 'tiktok', label: 'TikTok', color: 'platform-tiktok' },
-    { id: 'instagram', label: 'Instagram Reels', color: 'platform-instagram' },
-    { id: 'youtube', label: 'YouTube Shorts', color: 'platform-youtube' },
-  ];
+  const handleContinue = async () => {
+    if (!isValid) return;
+    
+    setIsSaving(true);
+    try {
+      await updateProfile.mutateAsync({ brand_name: brandName.trim(), niche });
+      await saveUserPlatforms.mutateAsync(selectedPlatforms);
+      navigate('/trends');
+    } catch (error) {
+      toast({
+        title: 'Error saving',
+        description: 'Failed to save your brand setup. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (authLoading || profileLoading || platformsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -93,17 +148,17 @@ export default function BrandSetup() {
                 Target Platforms
               </label>
               <div className="flex flex-wrap gap-3">
-                {platformOptions.map((platform) => (
+                {platforms?.map((platform) => (
                   <button
                     key={platform.id}
                     onClick={() => togglePlatform(platform.id)}
                     className={`px-5 py-3 rounded-lg border-2 font-medium transition-all duration-300 ${
-                      platforms.includes(platform.id)
+                      selectedPlatforms.includes(platform.id)
                         ? 'border-primary bg-primary/10 text-foreground'
                         : 'border-border bg-secondary text-muted-foreground hover:border-muted-foreground'
                     }`}
                   >
-                    {platform.label}
+                    {platform.name}
                   </button>
                 ))}
               </div>
@@ -115,12 +170,18 @@ export default function BrandSetup() {
             <Button
               variant="gradient"
               size="lg"
-              disabled={!isValid}
-              onClick={() => navigate('/trends')}
+              disabled={!isValid || isSaving}
+              onClick={handleContinue}
               className="group"
             >
-              Continue
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+              {isSaving ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </div>
         </div>

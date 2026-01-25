@@ -3,18 +3,62 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { processingSteps } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUpdateVideoStatus, useCreateGeneratedClips, useUserPlatforms } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Processing() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  
+  const updateVideoStatus = useUpdateVideoStatus();
+  const createGeneratedClips = useCreateGeneratedClips();
+  const { data: userPlatforms } = useUserPlatforms();
+  
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
+    if (hasStarted || authLoading || !user || !userPlatforms) return;
+    
+    const videoId = sessionStorage.getItem('currentVideoId');
+    if (!videoId) {
+      navigate('/upload');
+      return;
+    }
+    
+    setHasStarted(true);
+    
     let stepIndex = 0;
-    let cumulativeTime = 0;
 
-    const runSteps = () => {
+    const runSteps = async () => {
       if (stepIndex >= processingSteps.length) {
+        // Update video status and create clips
+        try {
+          await updateVideoStatus.mutateAsync({ videoId, status: 'processing' });
+          
+          // Get platforms from user selections
+          const platforms = userPlatforms
+            .map((up) => (up.platforms as any))
+            .filter(Boolean);
+          
+          if (platforms.length > 0) {
+            await createGeneratedClips.mutateAsync({ videoId, platforms });
+          }
+          
+          await updateVideoStatus.mutateAsync({ videoId, status: 'complete' });
+        } catch (error) {
+          console.error('Error during processing:', error);
+        }
+        
         // Navigate to results after all steps complete
         setTimeout(() => navigate('/results'), 500);
         return;
@@ -44,12 +88,18 @@ export default function Processing() {
         stepIndex++;
         runSteps();
       }, stepDuration);
-
-      cumulativeTime += stepDuration;
     };
 
     runSteps();
-  }, [navigate]);
+  }, [navigate, user, authLoading, userPlatforms, hasStarted]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

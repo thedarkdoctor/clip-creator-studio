@@ -1,18 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Filter } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
 import { TrendCard } from '@/components/TrendCard';
-import { mockTrends } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTrends, useSaveUserTrends, usePlatforms } from '@/hooks/useSupabaseData';
+import { useToast } from '@/hooks/use-toast';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function TrendSelection() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  
+  const { data: trends, isLoading: trendsLoading } = useTrends();
+  const { data: platforms } = usePlatforms();
+  const saveUserTrends = useSaveUserTrends();
+  
   const [selectedTrends, setSelectedTrends] = useState<string[]>([]);
   const [filter, setFilter] = useState<string>('all');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
 
   const toggleTrend = (id: string) => {
     setSelectedTrends((prev) =>
@@ -20,10 +37,46 @@ export default function TrendSelection() {
     );
   };
 
-  const filteredTrends =
-    filter === 'all'
-      ? mockTrends
-      : mockTrends.filter((t) => t.platform === filter);
+  // Map platform name to filter format
+  const getPlatformFilterName = (name: string) => {
+    if (name.includes('TikTok')) return 'tiktok';
+    if (name.includes('Instagram')) return 'instagram';
+    if (name.includes('YouTube')) return 'youtube';
+    return name.toLowerCase();
+  };
+
+  const filteredTrends = filter === 'all'
+    ? trends
+    : trends?.filter((t) => {
+        const platformName = (t.platforms as any)?.name || '';
+        return getPlatformFilterName(platformName) === filter;
+      });
+
+  const handleNext = async () => {
+    if (selectedTrends.length === 0) return;
+    
+    setIsSaving(true);
+    try {
+      await saveUserTrends.mutateAsync(selectedTrends);
+      navigate('/upload');
+    } catch (error) {
+      toast({
+        title: 'Error saving',
+        description: 'Failed to save your trend selections. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (authLoading || trendsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -76,19 +129,31 @@ export default function TrendSelection() {
 
           {/* Trend Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
-            {filteredTrends.map((trend, index) => (
-              <div
-                key={trend.id}
-                className="animate-fade-in"
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <TrendCard
-                  trend={trend}
-                  selected={selectedTrends.includes(trend.id)}
-                  onToggle={() => toggleTrend(trend.id)}
-                />
-              </div>
-            ))}
+            {filteredTrends?.map((trend, index) => {
+              const platformName = (trend.platforms as any)?.name || '';
+              const platform = getPlatformFilterName(platformName) as 'tiktok' | 'instagram' | 'youtube';
+              
+              return (
+                <div
+                  key={trend.id}
+                  className="animate-fade-in"
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <TrendCard
+                    trend={{
+                      id: trend.id,
+                      platform,
+                      title: trend.title,
+                      description: trend.description || '',
+                      engagement: trend.engagement || '',
+                      thumbnail: '/placeholder.svg',
+                    }}
+                    selected={selectedTrends.includes(trend.id)}
+                    onToggle={() => toggleTrend(trend.id)}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           {/* CTA */}
@@ -102,12 +167,18 @@ export default function TrendSelection() {
             <Button
               variant="gradient"
               size="lg"
-              disabled={selectedTrends.length === 0}
-              onClick={() => navigate('/upload')}
+              disabled={selectedTrends.length === 0 || isSaving}
+              onClick={handleNext}
               className="group"
             >
-              Next
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+              {isSaving ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <>
+                  Next
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
             </Button>
           </div>
         </div>

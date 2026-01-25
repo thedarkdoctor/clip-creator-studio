@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Play, Sparkles, Zap, Target } from 'lucide-react';
+import { ArrowRight, Play, Sparkles, Zap, Target, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
 
   const features = [
     {
@@ -24,15 +26,39 @@ export default function Landing() {
     },
   ];
 
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/brand-setup');
+    } else {
+      navigate('/auth');
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Logo size="sm" />
-          <Button variant="outline" size="sm">
-            Sign In
-          </Button>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={() => navigate('/brand-setup')}>
+                Dashboard
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                <LogOut size={16} />
+                Sign Out
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>
+              Sign In
+            </Button>
+          )}
         </div>
       </header>
 
@@ -63,10 +89,10 @@ export default function Landing() {
             <Button
               variant="gradient"
               size="xl"
-              onClick={() => navigate('/brand-setup')}
+              onClick={handleGetStarted}
               className="group"
             >
-              Get Started Free
+              {user ? 'Go to Dashboard' : 'Get Started Free'}
               <ArrowRight className="group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button variant="outline" size="xl">

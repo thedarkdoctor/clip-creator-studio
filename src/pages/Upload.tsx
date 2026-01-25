@@ -1,18 +1,33 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload as UploadIcon, File, X, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Upload as UploadIcon, File, X, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCreateVideo } from '@/hooks/useSupabaseData';
+import { useToast } from '@/hooks/use-toast';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function Upload() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const createVideo = useCreateVideo();
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -52,7 +67,37 @@ export default function Upload() {
     setIsUploading(false);
   };
 
+  const handleGenerate = async () => {
+    if (!file) return;
+    
+    setIsProcessing(true);
+    try {
+      // Create video record in database
+      const video = await createVideo.mutateAsync(file.name);
+      
+      // Store video ID for processing page
+      sessionStorage.setItem('currentVideoId', video.id);
+      
+      navigate('/processing');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create video record. Please try again.',
+        variant: 'destructive',
+      });
+      setIsProcessing(false);
+    }
+  };
+
   const isReady = file && uploadProgress >= 100;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -119,7 +164,7 @@ export default function Upload() {
                     </p>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon" onClick={clearFile}>
+                <Button variant="ghost" size="icon" onClick={clearFile} disabled={isProcessing}>
                   <X size={18} />
                 </Button>
               </div>
@@ -165,12 +210,18 @@ export default function Upload() {
             <Button
               variant="gradient"
               size="lg"
-              disabled={!isReady}
-              onClick={() => navigate('/processing')}
+              disabled={!isReady || isProcessing}
+              onClick={handleGenerate}
               className="group"
             >
-              <Sparkles className="group-hover:rotate-12 transition-transform" />
-              Generate Content
+              {isProcessing ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <>
+                  <Sparkles className="group-hover:rotate-12 transition-transform" />
+                  Generate Content
+                </>
+              )}
             </Button>
           </div>
         </div>
