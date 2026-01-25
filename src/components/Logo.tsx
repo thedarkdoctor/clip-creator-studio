@@ -28,7 +28,7 @@ export function Logo({ size = 'md', onClick, className }: LogoProps) {
         </div>
       </div>
       <span className={`font-bold ${sizeClasses[size]} gradient-text`}>
-        Content Engine
+        Cliplyst
       </span>
     </div>
   );
