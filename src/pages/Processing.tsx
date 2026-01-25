@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { processingSteps } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUpdateVideoStatus, useCreateGeneratedClips, useUserPlatforms } from '@/hooks/useSupabaseData';
+import { useUpdateVideoStatus, useCreateGeneratedClips, useUserPlatforms, useUserProfile } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Processing() {
@@ -14,6 +14,7 @@ export default function Processing() {
   const updateVideoStatus = useUpdateVideoStatus();
   const createGeneratedClips = useCreateGeneratedClips();
   const { data: userPlatforms } = useUserPlatforms();
+  const { data: userProfile } = useUserProfile();
   
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -41,8 +42,9 @@ export default function Processing() {
 
     const runSteps = async () => {
       if (stepIndex >= processingSteps.length) {
-        // Update video status and create clips
+        // Update video status and create clips using Lynkscope
         try {
+          console.log('[Processing] Updating video status to processing');
           await updateVideoStatus.mutateAsync({ videoId, status: 'processing' });
           
           // Get platforms from user selections
@@ -51,12 +53,27 @@ export default function Processing() {
             .filter(Boolean);
           
           if (platforms.length > 0) {
-            await createGeneratedClips.mutateAsync({ videoId, platforms });
+            console.log('[Processing] Generating clips with Lynkscope integration', {
+              platformCount: platforms.length,
+              brandName: userProfile?.brand_name,
+              niche: userProfile?.niche,
+            });
+            
+            // Generate clips with Lynkscope recommendations
+            await createGeneratedClips.mutateAsync({ 
+              videoId, 
+              platforms,
+              brandName: userProfile?.brand_name || undefined,
+              niche: userProfile?.niche || undefined,
+            });
           }
           
+          console.log('[Processing] Updating video status to complete');
           await updateVideoStatus.mutateAsync({ videoId, status: 'complete' });
         } catch (error) {
-          console.error('Error during processing:', error);
+          console.error('[Processing] Error during clip generation:', error);
+          // TODO: Show error UI to user instead of just console logging
+          // Consider adding error state and displaying friendly message
         }
         
         // Navigate to results after all steps complete
@@ -91,7 +108,7 @@ export default function Processing() {
     };
 
     runSteps();
-  }, [navigate, user, authLoading, userPlatforms, hasStarted]);
+  }, [navigate, user, authLoading, userPlatforms, userProfile, hasStarted]);
 
   if (authLoading) {
     return (
