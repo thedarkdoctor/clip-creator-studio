@@ -14,7 +14,232 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generated_clips: {
+        Row: {
+          caption: string | null
+          created_at: string
+          duration_seconds: number
+          hashtags: string[] | null
+          id: string
+          platform_id: string
+          video_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          duration_seconds: number
+          hashtags?: string[] | null
+          id?: string
+          platform_id: string
+          video_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          duration_seconds?: number
+          hashtags?: string[] | null
+          id?: string
+          platform_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_clips_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_clips_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platforms: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      trends: {
+        Row: {
+          created_at: string
+          description: string | null
+          engagement: string | null
+          id: string
+          is_active: boolean
+          platform_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          engagement?: string | null
+          id?: string
+          is_active?: boolean
+          platform_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          engagement?: string | null
+          id?: string
+          is_active?: boolean
+          platform_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trends_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_platforms: {
+        Row: {
+          created_at: string
+          id: string
+          platform_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_platforms_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "platforms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_platforms_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_trends: {
+        Row: {
+          created_at: string
+          id: string
+          trend_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          trend_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          trend_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_trends_trend_id_fkey"
+            columns: ["trend_id"]
+            isOneToOne: false
+            referencedRelation: "trends"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_trends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          brand_name: string | null
+          created_at: string
+          id: string
+          niche: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string
+          id: string
+          niche?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string
+          id?: string
+          niche?: string | null
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
