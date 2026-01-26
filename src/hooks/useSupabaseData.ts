@@ -81,31 +81,28 @@ export function useDiscoverTrends() {
 
       console.log('[TrendDiscovery] Discovered trends', { count: data.trends.length });
 
-      // Store discovered trends in database
+      // Store discovered trends in database (only use columns that exist)
       const trendInserts = data.trends.map((trend: any) => ({
         platform_id: userPlatforms.find(
           (up) => (up.platforms as any)?.name === trend.platform
         )?.platform_id,
         title: trend.title,
         description: trend.description,
-        media_url: trend.media_url,
-        media_type: trend.media_type,
-        embed_url: trend.embed_url,
-        views: trend.views,
-        likes: trend.likes,
-        source_url: trend.source_url,
         engagement: trend.engagement,
         is_active: true,
-        discovered_at: new Date().toISOString(),
       })).filter((t: any) => t.platform_id); // Only insert if platform_id exists
 
       if (trendInserts.length > 0) {
+        // Use insert instead of upsert since we don't have a unique constraint
         const { error: insertError } = await supabase
           .from('trends')
-          .upsert(trendInserts, { onConflict: 'title,platform_id' });
+          .insert(trendInserts);
         
         if (insertError) {
-          console.error('[TrendDiscovery] Failed to store trends:', insertError);
+          // Ignore duplicate key errors, log others
+          if (!insertError.message.includes('duplicate key')) {
+            console.error('[TrendDiscovery] Failed to store trends:', insertError);
+          }
         }
       }
 
