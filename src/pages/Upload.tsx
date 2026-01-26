@@ -73,14 +73,12 @@ export default function Upload() {
     
     setIsProcessing(true);
     try {
-      // Create video record in database (metadata only - no actual storage for MVP)
-      console.log('[Upload] Creating video record', { fileName: file.name, size: file.size });
+      // Upload video file to storage and create record
+      console.log('[Upload] Uploading video file', { fileName: file.name, size: file.size });
 
-      const video = await createVideo.mutateAsync({
-        fileName: file.name,
-      });
+      const video = await createVideo.mutateAsync({ file });
       
-      console.log('[Upload] Video record created', { videoId: video.id });
+      console.log('[Upload] Video uploaded and record created', { videoId: video.id });
       
       // Store video ID for processing page
       sessionStorage.setItem('currentVideoId', video.id);
@@ -90,7 +88,7 @@ export default function Upload() {
       console.error('[Upload] Error:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create video. Please try again.',
+        description: error.message || 'Failed to upload video. Please try again.',
         variant: 'destructive',
       });
       setIsProcessing(false);
