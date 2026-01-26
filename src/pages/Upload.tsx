@@ -7,7 +7,7 @@ import { ProgressSteps } from '@/components/ProgressSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateVideo } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
@@ -73,37 +73,14 @@ export default function Upload() {
     
     setIsProcessing(true);
     try {
-      // Upload video to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `videos/${fileName}`;
+      // Create video record in database (metadata only - no actual storage for MVP)
+      console.log('[Upload] Creating video record', { fileName: file.name, size: file.size });
 
-      console.log('[Upload] Uploading video to storage', { fileName, size: file.size });
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      console.log('[Upload] Video uploaded successfully', uploadData);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('videos')
-        .getPublicUrl(filePath);
-
-      // Create video record in database with storage path
       const video = await createVideo.mutateAsync({
         fileName: file.name,
-        storagePath: filePath,
-        fileSize: file.size,
       });
+      
+      console.log('[Upload] Video record created', { videoId: video.id });
       
       // Store video ID for processing page
       sessionStorage.setItem('currentVideoId', video.id);
@@ -113,7 +90,7 @@ export default function Upload() {
       console.error('[Upload] Error:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to upload video. Please try again.',
+        description: error.message || 'Failed to create video. Please try again.',
         variant: 'destructive',
       });
       setIsProcessing(false);
