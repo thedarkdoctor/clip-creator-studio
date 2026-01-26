@@ -69,16 +69,17 @@ export default function Upload() {
   };
 
   const handleGenerate = async () => {
-    if (!file) return;
+    if (!file || !user) return;
     
     setIsProcessing(true);
     try {
-      // Upload video to Supabase Storage
+      // Upload video to Supabase Storage with user-based folder structure
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `videos/${fileName}`;
+      // Use user.id as the folder name to match RLS policy
+      const filePath = `${user.id}/${fileName}`;
 
-      console.log('[Upload] Uploading video to storage', { fileName, size: file.size });
+      console.log('[Upload] Uploading video to storage', { fileName, size: file.size, userId: user.id });
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('videos')
