@@ -48,6 +48,72 @@ export function useTrends() {
   });
 }
 
+// Discover real trends via Edge Function
+export function useDiscoverTrends() {
+  const { user } = useAuth();
+  const { data: userProfile } = useUserProfile();
+  const { data: userPlatforms } = useUserPlatforms();
+  
+  return useMutation({
+    mutationFn: async () => {
+      if (!user || !userProfile || !userPlatforms) {
+        throw new Error('User profile or platforms not loaded');
+      }
+
+      const platforms = userPlatforms
+        .map((up) => (up.platforms as any)?.name)
+        .filter(Boolean);
+
+      if (platforms.length === 0) {
+        throw new Error('No platforms selected');
+      }
+
+      const { data, error } = await supabase.functions.invoke('trend-discovery', {
+        body: {
+          niche: userProfile.niche || '',
+          platforms,
+          keywords: [],
+        },
+      });
+
+      if (error) throw error;
+      if (!data || !data.trends) throw new Error('No trends returned');
+
+      console.log('[TrendDiscovery] Discovered trends', { count: data.trends.length });
+
+      // Store discovered trends in database
+      const trendInserts = data.trends.map((trend: any) => ({
+        platform_id: userPlatforms.find(
+          (up) => (up.platforms as any)?.name === trend.platform
+        )?.platform_id,
+        title: trend.title,
+        description: trend.description,
+        media_url: trend.media_url,
+        media_type: trend.media_type,
+        embed_url: trend.embed_url,
+        views: trend.views,
+        likes: trend.likes,
+        source_url: trend.source_url,
+        engagement: trend.engagement,
+        is_active: true,
+        discovered_at: new Date().toISOString(),
+      })).filter((t: any) => t.platform_id); // Only insert if platform_id exists
+
+      if (trendInserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('trends')
+          .upsert(trendInserts, { onConflict: 'title,platform_id' });
+        
+        if (insertError) {
+          console.error('[TrendDiscovery] Failed to store trends:', insertError);
+        }
+      }
+
+      return data.trends;
+    },
+  });
+}
+
 // Fetch user profile
 export function useUserProfile() {
   const { user } = useAuth();
@@ -189,27 +255,56 @@ export function useSaveUserTrends() {
   });
 }
 
+// Fetch user's selected trends
+export function useUserTrends() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['user-trends', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('user_trends')
+        .select('trend_id')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+}
+
 // Create video record
 export function useCreateVideo() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (fileName: string) => {
+    mutationFn: async (data: {
+      fileName: string;
+      storagePath: string;
+      fileSize: number;
+      durationSeconds?: number;
+    }) => {
       if (!user) throw new Error('Not authenticated');
       
-      const { data, error } = await supabase
+      const { data: video, error } = await supabase
         .from('videos')
         .insert({
           user_id: user.id,
-          file_name: fileName,
+          file_name: data.fileName,
+          storage_path: data.storagePath,
+          file_size: data.fileSize,
+          duration_seconds: data.durationSeconds,
           status: 'uploaded',
         })
         .select()
         .single();
       
       if (error) throw error;
-      return data as Video;
+      return video as Video;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['videos'] });
@@ -426,6 +521,64 @@ export function useLatestVideo() {
       return data as Video | null;
     },
     enabled: !!user,
+  });
+}
+
+// Schedule clips to Buffer
+export function useScheduleToBuffer() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (data: {
+      clip_ids: string[];
+      caption?: string;
+      hashtags?: string[];
+      platforms: string[];
+      posting_frequency: 'once_week' | 'twice_week' | 'daily' | 'every_other_day' | 'custom';
+      custom_schedule?: string[];
+      start_date?: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: result, error } = await supabase.functions.invoke('buffer-scheduler', {
+        body: {
+          user_id: user.id,
+          ...data,
+        },
+      });
+
+      if (error) throw error;
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Failed to schedule posts');
+      }
+
+      console.log('[Buffer] Scheduled posts', result.summary);
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buffer-posts'] });
+    },
+  });
+}
+
+// Fetch buffer posts for clips
+export function useBufferPosts(clipIds?: string[]) {
+  return useQuery({
+    queryKey: ['buffer-posts', clipIds],
+    queryFn: async () => {
+      if (!clipIds || clipIds.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('buffer_posts')
+        .select('*')
+        .in('clip_id', clipIds)
+        .order('scheduled_at');
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clipIds && clipIds.length > 0,
   });
 }
 
