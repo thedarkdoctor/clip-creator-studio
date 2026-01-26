@@ -26,7 +26,10 @@ ALTER TABLE public.generated_clips
   ADD COLUMN IF NOT EXISTS storage_path TEXT,
   ADD COLUMN IF NOT EXISTS start_time_seconds INTEGER,
   ADD COLUMN IF NOT EXISTS end_time_seconds INTEGER,
-  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT;
+  ADD COLUMN IF NOT EXISTS thumbnail_url TEXT,
+  ADD COLUMN IF NOT EXISTS font_style JSONB,
+  ADD COLUMN IF NOT EXISTS background_music_url TEXT,
+  ADD COLUMN IF NOT EXISTS additional_media_urls JSONB;
 
 -- 4. Add more platforms (Facebook, Twitter/X)
 INSERT INTO public.platforms (name) VALUES 

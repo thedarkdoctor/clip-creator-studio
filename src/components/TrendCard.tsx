@@ -36,9 +36,9 @@ export function TrendCard({ trend, selected, onToggle }: TrendCardProps) {
         {selected && <Check size={14} />}
       </div>
 
-      {/* Media Preview */}
+      {/* Media Preview - Playable Video */}
       {shouldShowMedia && !imageError && (
-        <div className="relative w-full h-48 mb-4 overflow-hidden bg-secondary">
+        <div className="relative w-full aspect-video mb-4 overflow-hidden bg-secondary rounded-t-lg">
           {hasEmbed ? (
             <iframe
               src={trend.embedUrl}
@@ -46,6 +46,7 @@ export function TrendCard({ trend, selected, onToggle }: TrendCardProps) {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               title={trend.title}
+              style={{ border: 'none' }}
             />
           ) : (
             <>
@@ -57,7 +58,7 @@ export function TrendCard({ trend, selected, onToggle }: TrendCardProps) {
               />
               {trend.mediaType === 'video' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                  <div className="w-12 h-12 rounded-full bg-primary/80 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-primary/80 flex items-center justify-center cursor-pointer hover:bg-primary transition-colors">
                     <Play size={24} className="text-primary-foreground ml-1" />
                   </div>
                 </div>
