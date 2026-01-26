@@ -276,18 +276,13 @@ export function useUserTrends() {
   });
 }
 
-// Create video record
+// Create video record (metadata only - no actual file storage for MVP)
 export function useCreateVideo() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async (data: {
-      fileName: string;
-      storagePath: string;
-      fileSize: number;
-      durationSeconds?: number;
-    }) => {
+    mutationFn: async (data: { fileName: string }) => {
       if (!user) throw new Error('Not authenticated');
       
       const { data: video, error } = await supabase
@@ -295,9 +290,6 @@ export function useCreateVideo() {
         .insert({
           user_id: user.id,
           file_name: data.fileName,
-          storage_path: data.storagePath,
-          file_size: data.fileSize,
-          duration_seconds: data.durationSeconds,
           status: 'uploaded',
         })
         .select()
