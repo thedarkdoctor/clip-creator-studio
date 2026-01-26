@@ -562,23 +562,24 @@ export function useScheduleToBuffer() {
   });
 }
 
-// Fetch buffer posts for clips
+// Fetch buffer posts for clips - placeholder until buffer_posts table is created
 export function useBufferPosts(clipIds?: string[]) {
   return useQuery({
     queryKey: ['buffer-posts', clipIds],
     queryFn: async () => {
-      if (!clipIds || clipIds.length === 0) return [];
-      
-      const { data, error } = await supabase
-        .from('buffer_posts')
-        .select('*')
-        .in('clip_id', clipIds)
-        .order('scheduled_at');
-      
-      if (error) throw error;
-      return data;
+      // Buffer posts table not yet created - return empty array
+      // This will be implemented when buffer integration is set up
+      return [] as Array<{
+        id: string;
+        clip_id: string;
+        buffer_post_id?: string;
+        platform: string;
+        caption: string;
+        hashtags: string[];
+        scheduled_at: string;
+        status: string;
+      }>;
     },
     enabled: !!clipIds && clipIds.length > 0,
   });
 }
-

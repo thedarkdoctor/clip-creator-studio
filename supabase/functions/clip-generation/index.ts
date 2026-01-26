@@ -48,7 +48,7 @@ interface ClipSpec {
     weight: string;
     color: string;
   };
-  background_music_url?: string;
+  background_music_url?: string | null;
   additional_media_urls?: string[];
 }
 
