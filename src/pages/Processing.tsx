@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { processingSteps } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUpdateVideoStatus, useUserPlatforms, useUserProfile, useUserTrends } from '@/hooks/useSupabaseData';
+import { useUpdateVideoStatus, useCreateGeneratedClips, useUserPlatforms, useUserProfile } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Processing() {
@@ -12,9 +12,9 @@ export default function Processing() {
   const { user, loading: authLoading } = useAuth();
   
   const updateVideoStatus = useUpdateVideoStatus();
+  const createGeneratedClips = useCreateGeneratedClips();
   const { data: userPlatforms } = useUserPlatforms();
   const { data: userProfile } = useUserProfile();
-  const { data: userTrends } = useUserTrends();
   
   const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -28,7 +28,7 @@ export default function Processing() {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (hasStarted || authLoading || !user || !userPlatforms || !userTrends) return;
+    if (hasStarted || authLoading || !user || !userPlatforms) return;
     
     const videoId = sessionStorage.getItem('currentVideoId');
     if (!videoId) {
@@ -42,46 +42,38 @@ export default function Processing() {
 
     const runSteps = async () => {
       if (stepIndex >= processingSteps.length) {
-        // Update video status and create clips using Edge Function
+        // Update video status and create clips using Lynkscope
         try {
           console.log('[Processing] Updating video status to processing');
           await updateVideoStatus.mutateAsync({ videoId, status: 'processing' });
           
-          // Get platforms and trends from user selections
+          // Get platforms from user selections
           const platforms = userPlatforms
-            .map((up) => (up.platforms as any)?.name)
+            .map((up) => (up.platforms as any))
             .filter(Boolean);
           
-          const selectedTrendIds = userTrends.map((ut) => ut.trend_id);
-
-          if (platforms.length > 0 && selectedTrendIds.length > 0) {
-            console.log('[Processing] Generating clips via Edge Function', {
+          if (platforms.length > 0) {
+            console.log('[Processing] Generating clips with Lynkscope integration', {
               platformCount: platforms.length,
-              trendCount: selectedTrendIds.length,
+              brandName: userProfile?.brand_name,
+              niche: userProfile?.niche,
             });
             
-            // Call clip-generation Edge Function
-            const { data, error } = await supabase.functions.invoke('clip-generation', {
-              body: {
-                video_id: videoId,
-                user_id: user.id,
-                selected_trend_ids: selectedTrendIds,
-                platforms,
-              },
+            // Generate clips with Lynkscope recommendations
+            await createGeneratedClips.mutateAsync({ 
+              videoId, 
+              platforms,
+              brandName: userProfile?.brand_name || undefined,
+              niche: userProfile?.niche || undefined,
             });
-
-            if (error) {
-              throw new Error(`Clip generation failed: ${error.message}`);
-            }
-
-            console.log('[Processing] Clips generated successfully', { count: data?.count });
           }
           
           console.log('[Processing] Updating video status to complete');
           await updateVideoStatus.mutateAsync({ videoId, status: 'complete' });
-        } catch (error: any) {
+        } catch (error) {
           console.error('[Processing] Error during clip generation:', error);
           // TODO: Show error UI to user instead of just console logging
+          // Consider adding error state and displaying friendly message
         }
         
         // Navigate to results after all steps complete
@@ -116,8 +108,7 @@ export default function Processing() {
     };
 
     runSteps();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate, user, authLoading, userPlatforms, userTrends, hasStarted]);
+  }, [navigate, user, authLoading, userPlatforms, userProfile, hasStarted]);
 
   if (authLoading) {
     return (

@@ -214,7 +214,6 @@ export type Database = {
           file_name: string
           id: string
           status: string
-          storage_path: string | null
           user_id: string
         }
         Insert: {
@@ -222,7 +221,6 @@ export type Database = {
           file_name: string
           id?: string
           status?: string
-          storage_path?: string | null
           user_id: string
         }
         Update: {
@@ -230,7 +228,6 @@ export type Database = {
           file_name?: string
           id?: string
           status?: string
-          storage_path?: string | null
           user_id?: string
         }
         Relationships: [

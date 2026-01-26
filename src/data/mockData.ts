@@ -5,8 +5,6 @@ export interface Trend {
   description: string;
   engagement: string;
   thumbnail: string;
-  embedUrl?: string;
-  mediaType?: 'video' | 'image';
 }
 
 export interface GeneratedClip {

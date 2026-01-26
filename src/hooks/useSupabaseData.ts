@@ -48,69 +48,6 @@ export function useTrends() {
   });
 }
 
-// Discover real trends via Edge Function
-export function useDiscoverTrends() {
-  const { user } = useAuth();
-  const { data: userProfile } = useUserProfile();
-  const { data: userPlatforms } = useUserPlatforms();
-  
-  return useMutation({
-    mutationFn: async () => {
-      if (!user || !userProfile || !userPlatforms) {
-        throw new Error('User profile or platforms not loaded');
-      }
-
-      const platforms = userPlatforms
-        .map((up) => (up.platforms as any)?.name)
-        .filter(Boolean);
-
-      if (platforms.length === 0) {
-        throw new Error('No platforms selected');
-      }
-
-      const { data, error } = await supabase.functions.invoke('trend-discovery', {
-        body: {
-          niche: userProfile.niche || '',
-          platforms,
-          keywords: [],
-        },
-      });
-
-      if (error) throw error;
-      if (!data || !data.trends) throw new Error('No trends returned');
-
-      console.log('[TrendDiscovery] Discovered trends', { count: data.trends.length });
-
-      // Store discovered trends in database (only use columns that exist)
-      const trendInserts = data.trends.map((trend: any) => ({
-        platform_id: userPlatforms.find(
-          (up) => (up.platforms as any)?.name === trend.platform
-        )?.platform_id,
-        title: trend.title,
-        description: trend.description,
-        engagement: trend.engagement,
-        is_active: true,
-      })).filter((t: any) => t.platform_id); // Only insert if platform_id exists
-
-      if (trendInserts.length > 0) {
-        // Use insert instead of upsert since we don't have a unique constraint
-        const { error: insertError } = await supabase
-          .from('trends')
-          .insert(trendInserts);
-        
-        if (insertError) {
-          // Ignore duplicate key errors, log others
-          if (!insertError.message.includes('duplicate key')) {
-            console.error('[TrendDiscovery] Failed to store trends:', insertError);
-          }
-        }
-      }
-
-      return data.trends;
-    },
-  });
-}
-
 // Fetch user profile
 export function useUserProfile() {
   const { user } = useAuth();
@@ -252,58 +189,27 @@ export function useSaveUserTrends() {
   });
 }
 
-// Fetch user's selected trends
-export function useUserTrends() {
-  const { user } = useAuth();
-  
-  return useQuery({
-    queryKey: ['user-trends', user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('user_trends')
-        .select('trend_id')
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-}
-
-// Create video record with file upload
+// Create video record
 export function useCreateVideo() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
   return useMutation({
-    mutationFn: async ({ file }: { file: File }) => {
+    mutationFn: async (fileName: string) => {
       if (!user) throw new Error('Not authenticated');
       
-      // Upload file to storage
-      const filePath = `${user.id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-      
-      // Create video record with storage path
-      const { data: video, error } = await supabase
+      const { data, error } = await supabase
         .from('videos')
         .insert({
           user_id: user.id,
-          file_name: file.name,
-          storage_path: filePath,
+          file_name: fileName,
           status: 'uploaded',
         })
         .select()
         .single();
       
       if (error) throw error;
-      return video as Video;
+      return data as Video;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['videos'] });
@@ -521,24 +427,5 @@ export function useLatestVideo() {
     },
     enabled: !!user,
   });
-}
-
-// Placeholder hooks for Buffer integration (not yet implemented)
-// These return no-op functions to prevent build errors
-export function useScheduleToBuffer() {
-  return {
-    mutateAsync: async () => {
-      console.warn('[Buffer] Buffer integration not yet configured');
-      throw new Error('Buffer integration not yet configured');
-    },
-    isPending: false,
-  };
-}
-
-export function useBufferPosts(_clipIds?: string[]) {
-  return {
-    data: [] as any[],
-    isLoading: false,
-  };
 }
 

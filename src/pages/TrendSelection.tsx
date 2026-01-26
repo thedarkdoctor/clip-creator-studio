@@ -6,7 +6,7 @@ import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
 import { TrendCard } from '@/components/TrendCard';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTrends, useSaveUserTrends, usePlatforms, useDiscoverTrends } from '@/hooks/useSupabaseData';
+import { useTrends, useSaveUserTrends, usePlatforms } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
@@ -16,16 +16,13 @@ export default function TrendSelection() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  const { data: trends, isLoading: trendsLoading, refetch: refetchTrends } = useTrends();
+  const { data: trends, isLoading: trendsLoading } = useTrends();
   const { data: platforms } = usePlatforms();
   const saveUserTrends = useSaveUserTrends();
-  const discoverTrends = useDiscoverTrends();
   
   const [selectedTrends, setSelectedTrends] = useState<string[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [isSaving, setIsSaving] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [hasAttemptedDiscovery, setHasAttemptedDiscovery] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -33,41 +30,6 @@ export default function TrendSelection() {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
-
-  const handleDiscoverTrends = async () => {
-    setIsDiscovering(true);
-    try {
-      await discoverTrends.mutateAsync();
-      await refetchTrends();
-      setHasAttemptedDiscovery(true);
-      toast({
-        title: 'Trends discovered',
-        description: 'Found trending content for your niche',
-      });
-    } catch (error: any) {
-      setHasAttemptedDiscovery(true);
-      toast({
-        title: 'Discovery failed',
-        description: error.message || 'Failed to discover trends. Using cached trends.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
-
-  // Discover trends on mount if we have user profile (only once)
-  useEffect(() => {
-    if (
-      !authLoading &&
-      user &&
-      !trendsLoading &&
-      !hasAttemptedDiscovery &&
-      (!trends || trends.length === 0)
-    ) {
-      handleDiscoverTrends();
-    }
-  }, [user, authLoading, trendsLoading, trends, hasAttemptedDiscovery]);
 
   const toggleTrend = (id: string) => {
     setSelectedTrends((prev) =>
@@ -142,23 +104,6 @@ export default function TrendSelection() {
               </p>
             </div>
 
-            {/* Discover Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDiscoverTrends}
-              disabled={isDiscovering}
-            >
-              {isDiscovering ? (
-                <>
-                  <Loader2 className="animate-spin mr-2" size={16} />
-                  Discovering...
-                </>
-              ) : (
-                'Discover New Trends'
-              )}
-            </Button>
-
             {/* Filter */}
             <div className="flex items-center gap-2">
               <Filter size={16} className="text-muted-foreground" />
@@ -201,9 +146,7 @@ export default function TrendSelection() {
                       title: trend.title,
                       description: trend.description || '',
                       engagement: trend.engagement || '',
-                      thumbnail: (trend as any).media_url || '/placeholder.svg',
-                      embedUrl: (trend as any).embed_url,
-                      mediaType: (trend as any).media_type || 'video',
+                      thumbnail: '/placeholder.svg',
                     }}
                     selected={selectedTrends.includes(trend.id)}
                     onToggle={() => toggleTrend(trend.id)}

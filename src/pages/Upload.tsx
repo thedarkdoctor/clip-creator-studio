@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCreateVideo } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 
-
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function Upload() {
@@ -73,22 +72,17 @@ export default function Upload() {
     
     setIsProcessing(true);
     try {
-      // Upload video file to storage and create record
-      console.log('[Upload] Uploading video file', { fileName: file.name, size: file.size });
-
-      const video = await createVideo.mutateAsync({ file });
-      
-      console.log('[Upload] Video uploaded and record created', { videoId: video.id });
+      // Create video record in database
+      const video = await createVideo.mutateAsync(file.name);
       
       // Store video ID for processing page
       sessionStorage.setItem('currentVideoId', video.id);
       
       navigate('/processing');
-    } catch (error: any) {
-      console.error('[Upload] Error:', error);
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to upload video. Please try again.',
+        description: 'Failed to create video record. Please try again.',
         variant: 'destructive',
       });
       setIsProcessing(false);
