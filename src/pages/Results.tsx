@@ -113,7 +113,7 @@ export default function Results() {
         platforms,
         posting_frequency: postingFrequency,
         custom_schedule: postingFrequency === 'custom' ? customSchedule : undefined,
-        start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+        start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       });
 
       toast({
@@ -191,7 +191,8 @@ export default function Results() {
                       className={`absolute top-2 right-2 z-10 ${
                         isSelected ? 'bg-primary text-primary-foreground' : 'bg-background/80'
                       } rounded-full p-2 cursor-pointer`}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (isSelected) {
                           setSelectedClips((prev) => prev.filter((id) => id !== clip.id));
                         } else {

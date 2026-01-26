@@ -93,11 +93,6 @@ export default function Upload() {
 
       console.log('[Upload] Video uploaded successfully', uploadData);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('videos')
-        .getPublicUrl(filePath);
-
       // Create video record in database with storage path
       const video = await createVideo.mutateAsync({
         fileName: file.name,

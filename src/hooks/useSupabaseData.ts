@@ -97,7 +97,7 @@ export function useDiscoverTrends() {
         engagement: trend.engagement,
         is_active: true,
         discovered_at: new Date().toISOString(),
-      })).filter((t: any) => t.platform_id); // Only insert if platform_id exists
+      })).filter((t: any) => t.platform_id);
 
       if (trendInserts.length > 0) {
         const { error: insertError } = await supabase
