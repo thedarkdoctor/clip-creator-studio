@@ -75,7 +75,7 @@ export default function Results() {
     const seconds = clip.duration_seconds % 60;
     const duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     
-    const bufferPost = bufferPosts?.find((bp) => bp.clip_id === clip.id);
+    const bufferPost = bufferPosts?.find((bp: any) => bp.clip_id === clip.id);
     
     return {
       id: clip.id,
@@ -108,13 +108,7 @@ export default function Results() {
           return 'TikTok';
         }))];
 
-      await scheduleToBuffer.mutateAsync({
-        clip_ids: selectedClips,
-        platforms,
-        posting_frequency: postingFrequency,
-        custom_schedule: postingFrequency === 'custom' ? customSchedule : undefined,
-        start_date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-      });
+      await scheduleToBuffer.mutateAsync();
 
       toast({
         title: 'Scheduled successfully',

@@ -26,7 +26,7 @@ interface ScheduleRequest {
 
 interface BufferPost {
   clip_id: string;
-  buffer_post_id?: string;
+  buffer_post_id?: string | null;
   scheduled_at: string;
   status: 'pending' | 'scheduled' | 'published' | 'failed';
   error_message?: string;
