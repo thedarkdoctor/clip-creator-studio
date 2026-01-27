@@ -7,7 +7,7 @@ import { ProgressSteps } from '@/components/ProgressSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatforms, useUserProfile, useUpdateProfile, useSaveUserPlatforms, useUserPlatforms } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
-import { niches } from '@/data/mockData';
+import { niches } from '@/data/staticConfig';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
