@@ -10,13 +10,24 @@ export default defineConfig(({ mode }) => ({
   },
   
   server: {
-    port: 3000,
-    host: '0.0.0.0',
-    allowedHosts: true,
+    host: true,
+    port: 8080,
+    strictPort: true,
+    cors: true,
     hmr: {
+      clientPort: 443,
       overlay: false,
     },
+    allowedHosts: true
   },
+
+  preview: {
+    host: true,
+    port: 8080,
+    strictPort: true,
+    allowedHosts: true
+  },
+
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
