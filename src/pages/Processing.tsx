@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import { processingSteps } from '@/data/mockData';
+import { processingSteps } from '@/data/staticConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUpdateVideoStatus, useUserPlatforms, useUserProfile, useUserTrends } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
