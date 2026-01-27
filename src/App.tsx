@@ -7,7 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import BrandSetup from "./pages/BrandSetup";
-import TrendSelection from "./pages/TrendSelection";
+import TrendSelection from "./pages/TrendSelectionV2";
 import Upload from "./pages/Upload";
 import Processing from "./pages/Processing";
 import Results from "./pages/Results";
