@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
       clientPort: 443,
       overlay: false,
     },
-    allowedHosts: 'all'
+    allowedHosts: true
   },
 
   preview: {

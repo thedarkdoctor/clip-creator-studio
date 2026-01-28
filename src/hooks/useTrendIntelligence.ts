@@ -1,4 +1,4 @@
-"/**
+/**
  * Trend Intelligence Hooks
  * Production-ready React hooks for trend data fetching
  */
@@ -256,4 +256,3 @@ export function useReportTrend() {
     },
   });
 }
-"

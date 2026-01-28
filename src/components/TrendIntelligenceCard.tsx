@@ -1,4 +1,4 @@
-"/**
+/**
  * Trend Intelligence Card Component
  * Displays trend analysis data (NOT video player)
  */
@@ -63,13 +63,13 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
       onClick={() => onSelect?.(trend)}
     >
       {/* Header */}
-      <div className=\"flex items-start justify-between gap-4 mb-4\">
-        <div className=\"flex-1\">
-          <h3 className=\"font-semibold text-lg mb-2 line-clamp-2\">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div className="flex-1">
+          <h3 className="font-semibold text-lg mb-2 line-clamp-2">
             {trend.title}
           </h3>
           
-          <div className=\"flex items-center gap-2 flex-wrap\">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Platform Badge */}
             <Badge className={`${getPlatformColor(trend.platform)} text-white`}>
               {trend.platform}
@@ -77,7 +77,7 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
             
             {/* Format Badge */}
             {trend.format_type && (
-              <Badge variant=\"secondary\">
+              <Badge variant="secondary">
                 {getFormatEmoji(trend.format_type)} {trend.format_type}
               </Badge>
             )}
@@ -85,11 +85,11 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
         </div>
 
         {/* Viral Score */}
-        <div className=\"flex flex-col items-center\">
+        <div className="flex flex-col items-center">
           <div className={`text-3xl font-bold ${getScoreColor(trend.trend_score)}`}>
             {trend.trend_score}
           </div>
-          <div className=\"text-xs text-muted-foreground flex items-center gap-1\">
+          <div className="text-xs text-muted-foreground flex items-center gap-1">
             <TrendingUp size={12} />
             Score
           </div>
@@ -98,50 +98,50 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
 
       {/* Hook Style */}
       {trend.hook_style && (
-        <div className=\"mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20\">
-          <div className=\"flex items-center gap-2 text-sm\">
-            <Zap size={14} className=\"text-primary\" />
-            <span className=\"font-medium\">Hook:</span>
-            <span className=\"text-muted-foreground\">{trend.hook_style}</span>
+        <div className="mb-3 p-2 rounded-lg bg-primary/5 border border-primary/20">
+          <div className="flex items-center gap-2 text-sm">
+            <Zap size={14} className="text-primary" />
+            <span className="font-medium">Hook:</span>
+            <span className="text-muted-foreground">{trend.hook_style}</span>
           </div>
         </div>
       )}
 
       {/* Engagement Metrics */}
       {trend.metrics && (
-        <div className=\"grid grid-cols-3 gap-2 mb-4\">
-          <div className=\"text-center p-2 rounded bg-secondary/50\">
-            <div className=\"text-sm font-bold\">{formatNumber(trend.metrics.views)}</div>
-            <div className=\"text-xs text-muted-foreground\">Views</div>
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="text-center p-2 rounded bg-secondary/50">
+            <div className="text-sm font-bold">{formatNumber(trend.metrics.views)}</div>
+            <div className="text-xs text-muted-foreground">Views</div>
           </div>
-          <div className=\"text-center p-2 rounded bg-secondary/50\">
-            <div className=\"text-sm font-bold\">{formatNumber(trend.metrics.likes)}</div>
-            <div className=\"text-xs text-muted-foreground\">Likes</div>
+          <div className="text-center p-2 rounded bg-secondary/50">
+            <div className="text-sm font-bold">{formatNumber(trend.metrics.likes)}</div>
+            <div className="text-xs text-muted-foreground">Likes</div>
           </div>
-          <div className=\"text-center p-2 rounded bg-secondary/50\">
-            <div className=\"text-sm font-bold\">{formatNumber(trend.metrics.shares)}</div>
-            <div className=\"text-xs text-muted-foreground\">Shares</div>
+          <div className="text-center p-2 rounded bg-secondary/50">
+            <div className="text-sm font-bold">{formatNumber(trend.metrics.shares)}</div>
+            <div className="text-xs text-muted-foreground">Shares</div>
           </div>
         </div>
       )}
 
       {/* Pattern Info */}
       {trend.pattern && (
-        <div className=\"space-y-2 mb-4 text-sm\">
+        <div className="space-y-2 mb-4 text-sm">
           {trend.pattern.pacing_pattern && (
-            <div className=\"flex items-center gap-2\">
-              <Clock size={14} className=\"text-primary\" />
-              <span className=\"text-muted-foreground\">{trend.pattern.pacing_pattern}</span>
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-primary" />
+              <span className="text-muted-foreground">{trend.pattern.pacing_pattern}</span>
             </div>
           )}
           
           {trend.avg_duration && (
-            <div className=\"flex items-center gap-2\">
-              <Clock size={14} className=\"text-primary\" />
-              <span className=\"text-muted-foreground\">
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-primary" />
+              <span className="text-muted-foreground">
                 Duration: {trend.avg_duration}s
                 {trend.duration_range_min && trend.duration_range_max && (
-                  <span className=\"text-xs ml-1\">
+                  <span className="text-xs ml-1">
                     ({trend.duration_range_min}-{trend.duration_range_max}s)
                   </span>
                 )}
@@ -153,16 +153,16 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
 
       {/* Hashtags */}
       {trend.hashtags && trend.hashtags.length > 0 && (
-        <div className=\"flex items-start gap-2 mb-4\">
-          <Hash size={14} className=\"text-primary mt-1\" />
-          <div className=\"flex flex-wrap gap-1\">
+        <div className="flex items-start gap-2 mb-4">
+          <Hash size={14} className="text-primary mt-1" />
+          <div className="flex flex-wrap gap-1">
             {trend.hashtags.slice(0, 5).map((tag: any, idx: number) => (
-              <span key={idx} className=\"text-xs text-primary\">
+              <span key={idx} className="text-xs text-primary">
                 {typeof tag === 'string' ? tag : tag.hashtag}
               </span>
             ))}
             {trend.hashtags.length > 5 && (
-              <span className=\"text-xs text-muted-foreground\">
+              <span className="text-xs text-muted-foreground">
                 +{trend.hashtags.length - 5} more
               </span>
             )}
@@ -171,11 +171,11 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
       )}
 
       {/* Actions */}
-      <div className=\"flex gap-2\">
+      <div className="flex gap-2">
         <Button
-          variant=\"outline\"
-          size=\"sm\"
-          className=\"flex-1\"
+          variant="outline"
+          size="sm"
+          className="flex-1"
           onClick={(e) => {
             e.stopPropagation();
             window.open(trend.source_url, '_blank');
@@ -188,7 +188,7 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
         {onSelect && (
           <Button
             variant={isSelected ? 'default' : 'secondary'}
-            size=\"sm\"
+            size="sm"
             onClick={(e) => {
               e.stopPropagation();
               onSelect(trend);
@@ -201,4 +201,3 @@ export function TrendIntelligenceCard({ trend, onSelect, isSelected }: TrendInte
     </div>
   );
 }
-"

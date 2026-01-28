@@ -1,4 +1,4 @@
-"/**
+/**
  * Trend Analysis Engine
  * 
  * Analyzes raw scraped trends to extract:
@@ -154,14 +154,12 @@ function analyzeHookStyle(title: string, description: string = ''): string {
   }
   
   // Shock/Surprise
-  if (text.includes('!!') || text.includes('😱') || text.includes('🤯') ||
-      firstWords.includes('you won\'t believe') || firstWords.includes('shocking')) {
+  if (text.includes('!!') || text.includes('you won\'t believe') || firstWords.includes('shocking')) {
     return 'Shock Hook';
   }
   
   // Urgent
-  if (text.includes('must') || text.includes('need to') || text.includes('secret') ||
-      text.includes('🔥') || text.includes('⚠️')) {
+  if (text.includes('must') || text.includes('need to') || text.includes('secret')) {
     return 'Urgent/Secret';
   }
   
@@ -482,4 +480,3 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
   console.log(`[Analysis] Processing complete: ${processedCount}/${rawTrends.length} successful`);
   return processedCount;
 }
-"
