@@ -1,1 +1,19 @@
 project_id = "hnkrklkozvgwjfxeearh"
+
+[functions.trend-discovery]
+verify_jwt = false
+
+[functions.clip-generation]
+verify_jwt = false
+
+[functions.buffer-scheduler]
+verify_jwt = false
+
+[functions.trend-scraper-worker]
+verify_jwt = false
+
+[functions.trend-analysis-worker]
+verify_jwt = false
+
+[functions.metrics-updater-worker]
+verify_jwt = false

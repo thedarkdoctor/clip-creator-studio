@@ -1,4 +1,4 @@
-"/**
+/**
  * Trend Intelligence Platform Types
  * 
  * Generated from trend_intelligence_schema.sql
@@ -83,4 +83,3 @@ export interface EnhancedTrend extends TrendV2 {
   pattern?: TrendPattern;
   hashtags?: TrendHashtag[];
 }
-"

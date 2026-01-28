@@ -1,4 +1,4 @@
-"/**
+/**
  * Static Configuration Data
  * (NOT mock trend data - real configuration values)
  */
@@ -28,4 +28,3 @@ export const processingSteps = [
   { text: 'Building content blueprint...', duration: 1500 },
   { text: 'Finalizing analysis...', duration: 800 },
 ];
-"

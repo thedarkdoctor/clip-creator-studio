@@ -1,21 +1,20 @@
-/**
- * Trend Intelligence Scraper
- * 
- * Scrapes trend aggregator sites (NOT direct social media platforms)
- * to collect viral trend data, engagement metrics, and pattern information.
- * 
- * Sources:
- * - TrendTok (tiktok trends)
- * - Social Blade
- * - Trend tracking websites
- * - Public trend APIs
- */
+// Trend Scraper Worker
+// Runs every 6 hours to scrape trends from aggregator sources
 
-import { supabase } from '@/integrations/supabase/client';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// ============================================================================
-// TYPES
-// ============================================================================
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Configuration
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+];
+const REQUEST_DELAY_MS = 2000;
+const MAX_RETRIES = 3;
 
 interface ScrapedTrend {
   title: string;
@@ -29,7 +28,6 @@ interface ScrapedTrend {
   comments?: number;
   audio_name?: string;
   duration?: number;
-  format_hints?: string[];
 }
 
 interface ScraperResult {
@@ -39,23 +37,6 @@ interface ScraperResult {
   source: string;
 }
 
-// ============================================================================
-// CONFIGURATION
-// ============================================================================
-
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-];
-
-const REQUEST_DELAY_MS = 2000; // 2 seconds between requests
-const MAX_RETRIES = 3;
-
-// ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
 function getRandomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
@@ -64,21 +45,17 @@ async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit = {},
-  retries: number = MAX_RETRIES
-): Promise<Response> {
+async function fetchWithRetry(url: string, options: RequestInit = {}): Promise<Response> {
   console.log(`[Scraper] Fetching: ${url}`);
   
   const headers = {
     'User-Agent': getRandomUserAgent(),
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
-    ...options.headers,
+    ...options.headers as Record<string, string>,
   };
 
-  for (let i = 0; i < retries; i++) {
+  for (let i = 0; i < MAX_RETRIES; i++) {
     try {
       const response = await fetch(url, { ...options, headers });
       
@@ -96,7 +73,7 @@ async function fetchWithRetry(
       
     } catch (error) {
       console.error(`[Scraper] Attempt ${i + 1} failed:`, error);
-      if (i === retries - 1) throw error;
+      if (i === MAX_RETRIES - 1) throw error;
       await delay(REQUEST_DELAY_MS);
     }
   }
@@ -104,29 +81,20 @@ async function fetchWithRetry(
   throw new Error('Max retries exceeded');
 }
 
-// ============================================================================
-// TREND AGGREGATOR SCRAPERS
-// ============================================================================
-
-/**
- * Scrape TikTok Creative Center (public trends page)
- */
+// TikTok Creative Center scraper
 async function scrapeTikTokCreativeCenter(): Promise<ScraperResult> {
   console.log('[Scraper] Scraping TikTok Creative Center...');
   
   try {
-    // TikTok Creative Center has public APIs we can use
     const url = 'https://ads.tiktok.com/creative_radar_api/v1/popular_trend/list';
     
     const response = await fetchWithRetry(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         page: 1,
         limit: 20,
-        period: 7, // Last 7 days
+        period: 7,
         country_code: 'US',
       }),
     });
@@ -137,7 +105,7 @@ async function scrapeTikTokCreativeCenter(): Promise<ScraperResult> {
     if (data.data?.list) {
       for (const item of data.data.list) {
         trends.push({
-          title: item.trend_name || item.hashtag_name,
+          title: item.trend_name || item.hashtag_name || 'TikTok Trend',
           description: item.trend_desc,
           platform: 'tiktok',
           source_url: item.trend_link || `https://www.tiktok.com/tag/${item.hashtag_name}`,
@@ -157,13 +125,11 @@ async function scrapeTikTokCreativeCenter(): Promise<ScraperResult> {
   }
 }
 
-/**
- * Scrape Instagram trending topics via RapidAPI
- */
+// Instagram trends scraper (via RapidAPI)
 async function scrapeInstagramTrends(): Promise<ScraperResult> {
   console.log('[Scraper] Scraping Instagram trends...');
   
-  const RAPID_API_KEY = import.meta.env.VITE_RAPID_API_KEY;
+  const RAPID_API_KEY = Deno.env.get('RAPID_API_KEY');
   
   if (!RAPID_API_KEY) {
     console.warn('[Scraper] RapidAPI key not found');
@@ -172,7 +138,7 @@ async function scrapeInstagramTrends(): Promise<ScraperResult> {
 
   try {
     const response = await fetchWithRetry(
-      'https://instagram-scraper-api2.p.rapidapi.com/v1/hashtag_posts',
+      'https://instagram-scraper-api2.p.rapidapi.com/v1/hashtag_posts?hashtag=trending',
       {
         headers: {
           'X-RapidAPI-Key': RAPID_API_KEY,
@@ -184,7 +150,6 @@ async function scrapeInstagramTrends(): Promise<ScraperResult> {
     const data = await response.json();
     const trends: ScrapedTrend[] = [];
 
-    // Process Instagram data
     if (data.items) {
       for (const item of data.items.slice(0, 10)) {
         trends.push({
@@ -209,13 +174,11 @@ async function scrapeInstagramTrends(): Promise<ScraperResult> {
   }
 }
 
-/**
- * Scrape YouTube trending via official API
- */
+// YouTube trending scraper
 async function scrapeYouTubeTrending(): Promise<ScraperResult> {
   console.log('[Scraper] Scraping YouTube trending...');
   
-  const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+  const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY');
   
   if (!YOUTUBE_API_KEY) {
     console.warn('[Scraper] YouTube API key not found');
@@ -223,11 +186,10 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
   }
 
   try {
-    // Get trending videos
     const url = new URL('https://www.googleapis.com/youtube/v3/videos');
     url.searchParams.set('part', 'snippet,statistics,contentDetails');
     url.searchParams.set('chart', 'mostPopular');
-    url.searchParams.set('videoCategoryId', '0'); // All categories
+    url.searchParams.set('videoCategoryId', '0');
     url.searchParams.set('maxResults', '20');
     url.searchParams.set('key', YOUTUBE_API_KEY);
 
@@ -237,9 +199,8 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
 
     if (data.items) {
       for (const item of data.items) {
-        const duration = parseYouTubeDuration(item.contentDetails.duration);
+        const duration = parseYouTubeDuration(item.contentDetails?.duration || '');
         
-        // Only include shorts (under 60 seconds)
         if (duration && duration < 61) {
           trends.push({
             title: item.snippet.title,
@@ -247,9 +208,9 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
             platform: 'youtube',
             source_url: `https://www.youtube.com/watch?v=${item.id}`,
             hashtags: extractHashtags(item.snippet.description || ''),
-            views: parseInt(item.statistics.viewCount || '0'),
-            likes: parseInt(item.statistics.likeCount || '0'),
-            comments: parseInt(item.statistics.commentCount || '0'),
+            views: parseInt(item.statistics?.viewCount || '0'),
+            likes: parseInt(item.statistics?.likeCount || '0'),
+            comments: parseInt(item.statistics?.commentCount || '0'),
             duration,
           });
         }
@@ -264,10 +225,6 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
     return { success: false, trends: [], error: error.message, source: 'youtube_api' };
   }
 }
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
 
 function extractHashtags(text: string): string[] {
   const matches = text.match(/#[\w]+/g);
@@ -287,43 +244,12 @@ function parseYouTubeDuration(isoDuration: string): number | null {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-// ============================================================================
-// MAIN SCRAPER ORCHESTRATOR
-// ============================================================================
-
-export async function runTrendScrapers(): Promise<void> {
-  console.log('[Scraper] Starting trend scraping cycle...');
-  
-  const results: ScraperResult[] = [];
-
-  // Run scrapers in sequence with delays
-  results.push(await scrapeTikTokCreativeCenter());
-  await delay(REQUEST_DELAY_MS);
-  
-  results.push(await scrapeInstagramTrends());
-  await delay(REQUEST_DELAY_MS);
-  
-  results.push(await scrapeYouTubeTrending());
-
-  // Store raw results
-  for (const result of results) {
-    await updateScraperStatus(result);
-    
-    if (result.success) {
-      for (const trend of result.trends) {
-        await storeRawTrend(trend, result.source);
-      }
-    }
-  }
-
-  console.log('[Scraper] Scraping cycle complete');
-}
-
-// ============================================================================
-// DATABASE STORAGE
-// ============================================================================
-
-async function storeRawTrend(trend: ScrapedTrend, source: string): Promise<void> {
+// Store raw trend data
+async function storeRawTrend(
+  supabase: any,
+  trend: ScrapedTrend,
+  source: string
+): Promise<void> {
   try {
     const { error } = await supabase
       .from('trend_raw_data')
@@ -341,41 +267,108 @@ async function storeRawTrend(trend: ScrapedTrend, source: string): Promise<void>
   }
 }
 
-async function updateScraperStatus(result: ScraperResult): Promise<void> {
+// Update scraper status
+async function updateScraperStatus(
+  supabase: any,
+  result: ScraperResult
+): Promise<void> {
   try {
     const { data: existing } = await supabase
       .from('scraper_status')
       .select('*')
       .eq('scraper_name', result.source)
-      .single();
+      .maybeSingle();
 
-    const updates = {
+    const updates: any = {
+      scraper_name: result.source,
       last_run_at: new Date().toISOString(),
       total_runs: (existing?.total_runs || 0) + 1,
+      is_enabled: true,
+      updated_at: new Date().toISOString(),
     };
 
     if (result.success) {
-      Object.assign(updates, {
-        last_success_at: new Date().toISOString(),
-        total_successes: (existing?.total_successes || 0) + 1,
-        last_error: null,
-      });
+      updates.last_success_at = new Date().toISOString();
+      updates.total_successes = (existing?.total_successes || 0) + 1;
+      updates.last_error = null;
     } else {
-      Object.assign(updates, {
-        total_failures: (existing?.total_failures || 0) + 1,
-        last_error: result.error,
-      });
+      updates.total_failures = (existing?.total_failures || 0) + 1;
+      updates.last_error = result.error;
     }
 
     await supabase
       .from('scraper_status')
-      .upsert({
-        scraper_name: result.source,
-        ...updates,
-        updated_at: new Date().toISOString(),
-      });
+      .upsert(updates, { onConflict: 'scraper_name' });
 
   } catch (error) {
     console.error('[Scraper] Failed to update status:', error);
   }
 }
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  console.log('[Scraper Worker] Starting trend scraping cycle...');
+  const startTime = Date.now();
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const results: ScraperResult[] = [];
+
+    // Run scrapers in sequence with delays
+    results.push(await scrapeTikTokCreativeCenter());
+    await delay(REQUEST_DELAY_MS);
+    
+    results.push(await scrapeInstagramTrends());
+    await delay(REQUEST_DELAY_MS);
+    
+    results.push(await scrapeYouTubeTrending());
+
+    // Store results and update status
+    let totalTrends = 0;
+    let successfulScrapers = 0;
+
+    for (const result of results) {
+      await updateScraperStatus(supabase, result);
+      
+      if (result.success) {
+        successfulScrapers++;
+        for (const trend of result.trends) {
+          await storeRawTrend(supabase, trend, result.source);
+          totalTrends++;
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[Scraper Worker] Cycle complete in ${duration}ms. Scraped ${totalTrends} trends from ${successfulScrapers}/3 scrapers.`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        totalTrends,
+        successfulScrapers,
+        duration,
+        results: results.map(r => ({
+          source: r.source,
+          success: r.success,
+          trendCount: r.trends.length,
+          error: r.error,
+        })),
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('[Scraper Worker] Fatal error:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
