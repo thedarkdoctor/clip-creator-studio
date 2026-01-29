@@ -1,8 +1,18 @@
 import { Check, TrendingUp, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlatformBadge } from './PlatformBadge';
-import type { Trend } from '@/data/mockData';
 import { useState } from 'react';
+
+interface Trend {
+  id: string;
+  title: string;
+  description: string | null;
+  platform: string;
+  engagement?: string | null;
+  thumbnail?: string;
+  embedUrl?: string;
+  mediaType?: string;
+}
 
 interface TrendCardProps {
   trend: Trend;
@@ -70,7 +80,7 @@ export function TrendCard({ trend, selected, onToggle }: TrendCardProps) {
 
       {/* Platform badge */}
       <div className="mb-4 px-4">
-        <PlatformBadge platform={trend.platform} />
+        <PlatformBadge platform={trend.platform as 'tiktok' | 'instagram' | 'youtube'} />
       </div>
 
       {/* Content */}
@@ -83,10 +93,12 @@ export function TrendCard({ trend, selected, onToggle }: TrendCardProps) {
         </p>
 
         {/* Engagement */}
-        <div className="flex items-center gap-2 text-sm text-primary">
-          <TrendingUp size={16} />
-          <span>{trend.engagement}</span>
-        </div>
+        {trend.engagement && (
+          <div className="flex items-center gap-2 text-sm text-primary">
+            <TrendingUp size={16} />
+            <span>{trend.engagement}</span>
+          </div>
+        )}
       </div>
     </div>
   );

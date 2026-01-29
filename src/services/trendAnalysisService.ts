@@ -7,6 +7,8 @@
  * - Pacing patterns
  * - Structural patterns
  * - Viral scoring
+ * 
+ * NOTE: Uses type assertions for new tables until Supabase types are regenerated.
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -16,12 +18,13 @@ import { supabase } from '@/integrations/supabase/client';
 // ============================================================================
 
 type FormatType = 'pov' | 'transformation' | 'tutorial' | 'meme' | 'storytime' | 'relatable' | 'aesthetic' | 'challenge' | 'other';
+type Platform = 'tiktok' | 'instagram' | 'youtube' | 'twitter' | 'facebook';
 
 interface AnalyzedTrend {
   // Core data
   title: string;
   description?: string;
-  platform: string;
+  platform: Platform;
   source_url: string;
   
   // Classification
@@ -307,7 +310,7 @@ export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
   const title = rawData.title || '';
   const description = rawData.description || '';
   const hashtags = rawData.hashtags || [];
-  const platform = rawData.platform;
+  const platform = rawData.platform as Platform;
   
   // Classify format
   const format_type = classifyFormat(title, description, hashtags);
@@ -374,8 +377,8 @@ export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
 export async function processRawTrends(limit: number = 50): Promise<number> {
   console.log(`[Analysis] Processing up to ${limit} raw trends...`);
   
-  // Fetch unprocessed raw trends
-  const { data: rawTrends, error } = await supabase
+  // Fetch unprocessed raw trends (use type assertion for new table)
+  const { data: rawTrends, error } = await (supabase as any)
     .from('trend_raw_data')
     .select('*')
     .eq('processed', false)
@@ -394,8 +397,8 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
       // Analyze the trend
       const analyzed = await analyzeTrend(raw.raw_payload);
       
-      // Store in trends_v2 table
-      const { data: trend, error: trendError } = await supabase
+      // Store in trends_v2 table (use type assertion)
+      const { data: trend, error: trendError } = await (supabase as any)
         .from('trends_v2')
         .insert({
           title: analyzed.title,
@@ -418,7 +421,7 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
       }
 
       // Store pattern data
-      await supabase.from('trend_patterns').insert({
+      await (supabase as any).from('trend_patterns').insert({
         trend_id: trend.id,
         intro_type: analyzed.intro_type,
         pacing_pattern: analyzed.pacing_pattern,
@@ -432,7 +435,7 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
           trend_id: trend.id,
           hashtag: tag,
         }));
-        await supabase.from('trend_hashtags').insert(hashtagInserts);
+        await (supabase as any).from('trend_hashtags').insert(hashtagInserts);
       }
 
       // Store metrics
@@ -441,7 +444,7 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
           ? ((analyzed.likes / analyzed.views) * 100).toFixed(2)
           : null;
 
-        await supabase.from('trend_metrics').insert({
+        await (supabase as any).from('trend_metrics').insert({
           trend_id: trend.id,
           views: analyzed.views,
           likes: analyzed.likes,
@@ -452,7 +455,7 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
       }
 
       // Mark raw data as processed
-      await supabase
+      await (supabase as any)
         .from('trend_raw_data')
         .update({
           processed: true,
@@ -467,7 +470,7 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
       console.error(`[Analysis] Failed to process trend ${raw.id}:`, error);
       
       // Mark as processed with error
-      await supabase
+      await (supabase as any)
         .from('trend_raw_data')
         .update({
           processed: true,

@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Tables } from '@/integrations/supabase/types';
-import { getSEORecommendations } from '@/services/lynkscopeClient';
 
 type Platform = Tables<'platforms'>;
 type Trend = Tables<'trends'>;
@@ -400,36 +399,32 @@ export function useCreateGeneratedClips() {
 
       const allClips: any[] = [];
 
-      // Generate clips for each platform using Lynkscope
+      // Generate clips for each platform with basic content
       for (const platform of platforms) {
-        console.log(`[ClipGeneration] Fetching Lynkscope recommendations for ${platform.name}`);
+        console.log(`[ClipGeneration] Generating clips for ${platform.name}`);
         
         try {
-          // Call Lynkscope to get SEO recommendations
-          const lynkscopeResponse = await getSEORecommendations(
-            platform.name,
-            brandName,
-            niche
-          );
-
-          if (!lynkscopeResponse.success || !lynkscopeResponse.data) {
-            console.error(`[ClipGeneration] Lynkscope failed for ${platform.name}:`, lynkscopeResponse.error);
-            // Fall back to basic clips if Lynkscope fails
-            throw new Error(`Failed to get recommendations for ${platform.name}`);
-          }
-
-          const { captions, hashtags, optimalDurations } = lynkscopeResponse.data;
-
           // Generate 2-3 clips per platform with varied content
-          const clipsPerPlatform = Math.min(3, captions.length);
+          const clipsPerPlatform = 3;
+          const baseCaptions = [
+            `Check out this amazing content for ${platform.name}! 🔥`,
+            `You won't believe this ${platform.name} moment! 🎬`,
+            `Watch till the end! Perfect for ${platform.name} 💯`,
+          ];
+          const baseHashtags = [
+            ['#viral', '#trending', '#fyp'],
+            ['#mustwatch', '#content', '#creator'],
+            ['#amazing', '#shorts', '#reels'],
+          ];
+          const durations = [30, 45, 60];
           
           for (let i = 0; i < clipsPerPlatform; i++) {
             const clip = {
               video_id: videoId,
               platform_id: platform.id,
-              duration_seconds: optimalDurations[i] || optimalDurations[0] || 30,
-              caption: captions[i] || captions[0],
-              hashtags: hashtags[i] || hashtags[0] || [],
+              duration_seconds: durations[i] || 30,
+              caption: baseCaptions[i] || baseCaptions[0],
+              hashtags: baseHashtags[i] || baseHashtags[0],
             };
 
             allClips.push(clip);

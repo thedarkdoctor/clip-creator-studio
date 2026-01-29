@@ -26,7 +26,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/brand-setup" element={<BrandSetup />} />
-            <Route path="/trends" element={<TrendSelectionV2 />} />
+            <Route path="/trends" element={<TrendSelection />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/processing" element={<Processing />} />
             <Route path="/results" element={<Results />} />
