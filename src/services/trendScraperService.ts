@@ -9,6 +9,8 @@
  * - Social Blade
  * - Trend tracking websites
  * - Public trend APIs
+ * 
+ * NOTE: Uses type assertions for new tables until Supabase types are regenerated.
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -167,7 +169,7 @@ async function scrapeInstagramTrends(): Promise<ScraperResult> {
   
   if (!RAPID_API_KEY) {
     console.warn('[Scraper] RapidAPI key not found');
-    return { success: false, trends: [], error: 'API key missing', source: 'instagram_rapid' };
+    return { success: false, trends: [], error: 'API key missing', source: 'instagram_rapidapi' };
   }
 
   try {
@@ -201,11 +203,11 @@ async function scrapeInstagramTrends(): Promise<ScraperResult> {
     }
 
     console.log(`[Scraper] Instagram: Found ${trends.length} trends`);
-    return { success: true, trends, source: 'instagram_rapid' };
+    return { success: true, trends, source: 'instagram_rapidapi' };
     
   } catch (error: any) {
     console.error('[Scraper] Instagram scraping failed:', error);
-    return { success: false, trends: [], error: error.message, source: 'instagram_rapid' };
+    return { success: false, trends: [], error: error.message, source: 'instagram_rapidapi' };
   }
 }
 
@@ -219,7 +221,7 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
   
   if (!YOUTUBE_API_KEY) {
     console.warn('[Scraper] YouTube API key not found');
-    return { success: false, trends: [], error: 'API key missing', source: 'youtube_api' };
+    return { success: false, trends: [], error: 'API key missing', source: 'youtube_trending' };
   }
 
   try {
@@ -257,11 +259,11 @@ async function scrapeYouTubeTrending(): Promise<ScraperResult> {
     }
 
     console.log(`[Scraper] YouTube: Found ${trends.length} shorts trends`);
-    return { success: true, trends, source: 'youtube_api' };
+    return { success: true, trends, source: 'youtube_trending' };
     
   } catch (error: any) {
     console.error('[Scraper] YouTube scraping failed:', error);
-    return { success: false, trends: [], error: error.message, source: 'youtube_api' };
+    return { success: false, trends: [], error: error.message, source: 'youtube_trending' };
   }
 }
 
@@ -325,7 +327,8 @@ export async function runTrendScrapers(): Promise<void> {
 
 async function storeRawTrend(trend: ScrapedTrend, source: string): Promise<void> {
   try {
-    const { error } = await supabase
+    // Use type assertion for new table
+    const { error } = await (supabase as any)
       .from('trend_raw_data')
       .insert({
         source,
@@ -343,31 +346,28 @@ async function storeRawTrend(trend: ScrapedTrend, source: string): Promise<void>
 
 async function updateScraperStatus(result: ScraperResult): Promise<void> {
   try {
-    const { data: existing } = await supabase
+    // Use type assertion for new table
+    const { data: existing } = await (supabase as any)
       .from('scraper_status')
       .select('*')
       .eq('scraper_name', result.source)
-      .single();
+      .maybeSingle();
 
-    const updates = {
+    const updates: Record<string, any> = {
       last_run_at: new Date().toISOString(),
       total_runs: (existing?.total_runs || 0) + 1,
     };
 
     if (result.success) {
-      Object.assign(updates, {
-        last_success_at: new Date().toISOString(),
-        total_successes: (existing?.total_successes || 0) + 1,
-        last_error: null,
-      });
+      updates.last_success_at = new Date().toISOString();
+      updates.total_successes = (existing?.total_successes || 0) + 1;
+      updates.last_error = null;
     } else {
-      Object.assign(updates, {
-        total_failures: (existing?.total_failures || 0) + 1,
-        last_error: result.error,
-      });
+      updates.total_failures = (existing?.total_failures || 0) + 1;
+      updates.last_error = result.error;
     }
 
-    await supabase
+    await (supabase as any)
       .from('scraper_status')
       .upsert({
         scraper_name: result.source,

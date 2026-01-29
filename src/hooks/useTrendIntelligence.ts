@@ -1,11 +1,15 @@
 /**
  * Trend Intelligence Hooks
  * Production-ready React hooks for trend data fetching
+ * 
+ * NOTE: These hooks use type assertions because the Supabase types
+ * are auto-generated and may not yet include the new trend_v2 tables.
+ * Once the types are regenerated, the assertions can be removed.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { TrendV2, EnhancedTrend } from '@/types/trendIntelligence';
+import type { TrendV2, EnhancedTrend, ScraperStatus } from '@/types/trendIntelligence';
 
 // ============================================================================
 // TREND QUERIES
@@ -27,11 +31,14 @@ export function useTrends(filters?: TrendFilters) {
     queryFn: async () => {
       console.log('[useTrends] Fetching trends with filters:', filters);
       
-      let query = supabase
+      // Use type assertion since types may not be regenerated yet
+      let query = (supabase as any)
         .from('trends_v2')
         .select(`
           *,
           trend_metrics (
+            id,
+            trend_id,
             views,
             likes,
             shares,
@@ -40,13 +47,23 @@ export function useTrends(filters?: TrendFilters) {
             collected_at
           ),
           trend_patterns (
+            id,
+            trend_id,
             intro_type,
             pacing_pattern,
             editing_style,
-            caption_structure
+            caption_structure,
+            text_overlay_frequency,
+            transition_style,
+            color_grading,
+            created_at
           ),
           trend_hashtags (
-            hashtag
+            id,
+            trend_id,
+            hashtag,
+            frequency_score,
+            created_at
           )
         `)
         .eq('is_active', true)
@@ -105,11 +122,13 @@ export function useTrendDetail(trendId: string | undefined) {
       
       console.log('[useTrendDetail] Fetching trend:', trendId);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('trends_v2')
         .select(`
           *,
           trend_metrics (
+            id,
+            trend_id,
             views,
             likes,
             shares,
@@ -118,16 +137,23 @@ export function useTrendDetail(trendId: string | undefined) {
             collected_at
           ),
           trend_patterns (
+            id,
+            trend_id,
             intro_type,
             pacing_pattern,
             editing_style,
             caption_structure,
             text_overlay_frequency,
-            transition_style
+            transition_style,
+            color_grading,
+            created_at
           ),
           trend_hashtags (
+            id,
+            trend_id,
             hashtag,
-            frequency_score
+            frequency_score,
+            created_at
           )
         `)
         .eq('id', trendId)
@@ -161,7 +187,7 @@ export function usePlatformStats() {
     queryFn: async () => {
       console.log('[usePlatformStats] Fetching platform statistics');
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('trends_v2')
         .select('platform, trend_score')
         .eq('is_active', true);
@@ -169,7 +195,7 @@ export function usePlatformStats() {
       if (error) throw error;
 
       // Aggregate stats by platform
-      const stats = data.reduce((acc: any, trend) => {
+      const stats = (data || []).reduce((acc: any, trend: any) => {
         if (!acc[trend.platform]) {
           acc[trend.platform] = {
             count: 0,
@@ -208,7 +234,7 @@ export function useScraperStatus() {
     queryFn: async () => {
       console.log('[useScraperStatus] Fetching scraper status');
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('scraper_status')
         .select('*')
         .order('last_run_at', { ascending: false });
@@ -218,7 +244,7 @@ export function useScraperStatus() {
         throw error;
       }
 
-      return data;
+      return data as ScraperStatus[];
     },
     refetchInterval: 60 * 1000, // Refresh every minute
   });

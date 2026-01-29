@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { Download, Copy, RefreshCw, Play, Clock, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformBadge } from './PlatformBadge';
-import type { GeneratedClip } from '@/data/mockData';
+
+interface GeneratedClip {
+  id: string;
+  platform: string;
+  caption: string;
+  hashtags: string[];
+  duration: string;
+}
 
 interface ClipCardProps {
   clip: GeneratedClip;
@@ -37,7 +44,7 @@ export function ClipCard({ clip }: ClipCardProps) {
 
         {/* Platform badge */}
         <div className="absolute top-3 left-3">
-          <PlatformBadge platform={clip.platform} size="sm" />
+          <PlatformBadge platform={clip.platform as 'tiktok' | 'instagram' | 'youtube'} size="sm" />
         </div>
       </div>
 
