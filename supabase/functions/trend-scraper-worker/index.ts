@@ -1,5 +1,5 @@
-// Trend Scraper Worker - SocialKit API Integration
-// Runs every 6 hours to scrape trends from SocialKit endpoints
+// Trend Scraper Worker - TikTok via SocialKit API (Primary Source)
+// Runs every 6 hours to scrape trends using multiple hashtag searches
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -11,16 +11,35 @@ const corsHeaders = {
 // Configuration
 const FETCH_TIMEOUT_MS = 30000;
 
+// Trending hashtags to scrape - diverse niches
+const TRENDING_HASHTAGS = [
+  'viral',
+  'fyp',
+  'trending',
+  'foryou',
+  'pov',
+  'challenge',
+  'dance',
+  'tutorial',
+  'funny',
+  'comedy',
+  'beauty',
+  'fitness',
+  'food',
+  'fashion',
+  'lifestyle',
+];
+
 interface ScrapedTrend {
   title: string;
   description?: string;
-  platform: 'tiktok' | 'instagram' | 'youtube' | 'twitter' | 'facebook';
+  platform: 'tiktok';
   source_url: string;
-  hashtags?: string[];
-  views?: number;
-  likes?: number;
-  shares?: number;
-  comments?: number;
+  hashtags: string[];
+  views: number;
+  likes: number;
+  shares: number;
+  comments: number;
   audio_name?: string;
   duration?: number;
   published_at?: string;
@@ -31,7 +50,7 @@ interface ScraperResult {
   success: boolean;
   trends: ScrapedTrend[];
   error?: string;
-  source: string;
+  hashtag: string;
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
@@ -50,51 +69,55 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
 
 function extractHashtags(text: string): string[] {
   if (!text) return [];
-  const matches = text.match(/#[\w\u0600-\u06FF]+/g);
+  const matches = text.match(/#[\w\u0600-\u06FF\u4e00-\u9fff]+/g);
   return matches ? matches.slice(0, 10) : [];
 }
 
-// TikTok Hashtag Search via SocialKit
-async function scrapeTikTokTrends(apiKey: string): Promise<ScraperResult> {
-  console.log('[Scraper] Fetching TikTok trends via SocialKit...');
+function parseNumericValue(value: any): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    if (!isNaN(num)) return num;
+  }
+  return 0;
+}
+
+// Scrape TikTok trends for a specific hashtag
+async function scrapeTikTokHashtag(apiKey: string, hashtag: string): Promise<ScraperResult> {
+  console.log(`[Scraper] Fetching TikTok #${hashtag} trends...`);
   
   const trends: ScrapedTrend[] = [];
   
   try {
-    const url = `https://api.socialkit.dev/tiktok/hashtag-search?access_key=${apiKey}&hashtag=viral&limit=15`;
-    console.log('[Scraper] Calling SocialKit TikTok API...');
+    const url = `https://api.socialkit.dev/tiktok/hashtag-search?access_key=${apiKey}&hashtag=${encodeURIComponent(hashtag)}&limit=20`;
     
     const response = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
     const data = await response.json();
     
-    console.log('[Scraper] Response success:', data.success, 'results:', data.data?.results?.length || 0);
-    
     if (data.success && data.data?.results) {
       for (const item of data.data.results) {
-        // Extract stats from the correct nested structure
         const stats = item.stats || {};
         const video = item.video || {};
         const author = item.author || {};
         const music = item.music || {};
+        const desc = item.desc || '';
+        
+        // Skip if no meaningful content
+        if (!desc && !item.id) continue;
         
         trends.push({
-          title: item.desc?.slice(0, 100) || 'TikTok Trend',
-          description: item.desc,
+          title: desc.slice(0, 200) || `TikTok #${hashtag}`,
+          description: desc,
           platform: 'tiktok',
-          source_url: item.url || `https://www.tiktok.com/@${author.uniqueId}/video/${item.id}`,
-          hashtags: extractHashtags(item.desc || ''),
-          // Stats from the stats object
-          views: stats.views || stats.playCount,
-          likes: stats.likes || stats.diggCount,
-          comments: stats.comments || stats.commentCount,
-          shares: stats.shares || stats.shareCount,
-          // Video metadata
-          duration: video.duration || item.duration,
-          // Music/audio info
-          audio_name: music.title || music.author,
-          // Author info
-          author: author.nickname || author.uniqueId,
-          // Timestamp
+          source_url: item.url || `https://www.tiktok.com/@${author.uniqueId || 'user'}/video/${item.id}`,
+          hashtags: extractHashtags(desc),
+          views: parseNumericValue(stats.views || stats.playCount || 0),
+          likes: parseNumericValue(stats.likes || stats.diggCount || 0),
+          comments: parseNumericValue(stats.comments || stats.commentCount || 0),
+          shares: parseNumericValue(stats.shares || stats.shareCount || 0),
+          duration: parseNumericValue(video.duration || item.duration || 0),
+          audio_name: music.title || music.author || undefined,
+          author: author.nickname || author.uniqueId || undefined,
           published_at: item.createTime 
             ? new Date(item.createTime * 1000).toISOString() 
             : undefined,
@@ -102,13 +125,32 @@ async function scrapeTikTokTrends(apiKey: string): Promise<ScraperResult> {
       }
     }
     
-    console.log(`[Scraper] TikTok: Found ${trends.length} trends with stats`);
-    return { success: trends.length > 0, trends, source: 'socialkit_tiktok' };
+    console.log(`[Scraper] #${hashtag}: Found ${trends.length} trends`);
+    return { success: trends.length > 0, trends, hashtag };
     
   } catch (error: any) {
-    console.error('[Scraper] TikTok error:', error.message);
-    return { success: false, trends: [], error: error.message, source: 'socialkit_tiktok' };
+    console.error(`[Scraper] #${hashtag} error:`, error.message);
+    return { success: false, trends: [], error: error.message, hashtag };
   }
+}
+
+// Check for duplicate URLs to avoid re-scraping same content
+async function filterExistingTrends(supabase: any, trends: ScrapedTrend[]): Promise<ScrapedTrend[]> {
+  if (trends.length === 0) return [];
+  
+  const urls = trends.map(t => t.source_url);
+  
+  // Check existing in trend_raw_data
+  const { data: existing } = await supabase
+    .from('trend_raw_data')
+    .select('raw_payload')
+    .in('raw_payload->>source_url', urls);
+  
+  const existingUrls = new Set(
+    (existing || []).map((e: any) => e.raw_payload?.source_url)
+  );
+  
+  return trends.filter(t => !existingUrls.has(t.source_url));
 }
 
 Deno.serve(async (req) => {
@@ -116,7 +158,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  console.log('[Scraper Worker] Starting trend scraping...');
+  console.log('[Scraper Worker] Starting TikTok trend scraping...');
   const startTime = Date.now();
 
   try {
@@ -133,51 +175,87 @@ Deno.serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Scrape TikTok trends
-    const result = await scrapeTikTokTrends(socialKitApiKey);
-    
-    // Update scraper status
-    const { data: existing } = await supabase
+    let totalTrends = 0;
+    let totalStored = 0;
+    const results: { hashtag: string; found: number; stored: number }[] = [];
+
+    // Scrape each trending hashtag
+    for (const hashtag of TRENDING_HASHTAGS) {
+      const result = await scrapeTikTokHashtag(socialKitApiKey, hashtag);
+      
+      // Update scraper status for this hashtag
+      const scraperName = `tiktok_${hashtag}`;
+      const { data: existing } = await supabase
+        .from('scraper_status')
+        .select('*')
+        .eq('scraper_name', scraperName)
+        .maybeSingle();
+
+      await supabase.from('scraper_status').upsert({
+        scraper_name: scraperName,
+        last_run_at: new Date().toISOString(),
+        last_success_at: result.success ? new Date().toISOString() : existing?.last_success_at,
+        total_runs: (existing?.total_runs || 0) + 1,
+        total_successes: (existing?.total_successes || 0) + (result.success ? 1 : 0),
+        total_failures: (existing?.total_failures || 0) + (result.success ? 0 : 1),
+        last_error: result.error || null,
+        is_enabled: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'scraper_name' });
+
+      if (result.success && result.trends.length > 0) {
+        // Filter out duplicates
+        const newTrends = await filterExistingTrends(supabase, result.trends);
+        
+        totalTrends += result.trends.length;
+        
+        // Store new trends
+        for (const trend of newTrends) {
+          const { error } = await supabase.from('trend_raw_data').insert({
+            source: 'socialkit_tiktok',
+            raw_payload: trend,
+            processed: false,
+          });
+          if (!error) totalStored++;
+        }
+        
+        results.push({ hashtag, found: result.trends.length, stored: newTrends.length });
+      } else {
+        results.push({ hashtag, found: 0, stored: 0 });
+      }
+      
+      // Small delay between requests to be nice to the API
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Update main scraper status
+    const { data: mainStatus } = await supabase
       .from('scraper_status')
       .select('*')
-      .eq('scraper_name', result.source)
+      .eq('scraper_name', 'socialkit_tiktok')
       .maybeSingle();
 
     await supabase.from('scraper_status').upsert({
-      scraper_name: result.source,
+      scraper_name: 'socialkit_tiktok',
       last_run_at: new Date().toISOString(),
-      last_success_at: result.success ? new Date().toISOString() : existing?.last_success_at,
-      total_runs: (existing?.total_runs || 0) + 1,
-      total_successes: (existing?.total_successes || 0) + (result.success ? 1 : 0),
-      total_failures: (existing?.total_failures || 0) + (result.success ? 0 : 1),
-      last_error: result.error || null,
+      last_success_at: totalStored > 0 ? new Date().toISOString() : mainStatus?.last_success_at,
+      total_runs: (mainStatus?.total_runs || 0) + 1,
+      total_successes: (mainStatus?.total_successes || 0) + (totalStored > 0 ? 1 : 0),
+      total_failures: (mainStatus?.total_failures || 0) + (totalStored === 0 ? 1 : 0),
       is_enabled: true,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'scraper_name' });
 
-    // Store trends
-    let storedCount = 0;
-    if (result.success) {
-      for (const trend of result.trends) {
-        const { error } = await supabase.from('trend_raw_data').insert({
-          source: result.source,
-          raw_payload: trend,
-          processed: false,
-        });
-        if (!error) storedCount++;
-      }
-    }
-
     const duration = Date.now() - startTime;
-    console.log(`[Scraper Worker] Done in ${duration}ms. Stored ${storedCount} trends.`);
+    console.log(`[Scraper Worker] Done in ${duration}ms. Found: ${totalTrends}, Stored: ${totalStored}`);
 
     return new Response(
       JSON.stringify({
-        success: result.success,
-        totalTrends: storedCount,
+        success: totalStored > 0,
+        totalFound: totalTrends,
+        totalStored,
         duration,
-        source: result.source,
-        error: result.error,
+        hashtags: results,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
