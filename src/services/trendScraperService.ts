@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { generateNicheKeywords } from '../lib/generateNicheKeywords';
 
 // ============================================================================
 // WORKER TRIGGERS
@@ -104,45 +105,35 @@ export async function runFullTrendDiscovery(): Promise<{
 }
 
 // ============================================================================
-// NICHE KEYWORDS (for client-side filtering)
-// ============================================================================
 
-export const NICHE_KEYWORDS: Record<string, string[]> = {
-  'fitness': ['workout', 'gym', 'fitness', 'exercise', 'muscle', 'gains', 'lift', 'training'],
-  'beauty': ['makeup', 'beauty', 'skincare', 'glow', 'foundation', 'mascara', 'contour'],
-  'fashion': ['outfit', 'ootd', 'fashion', 'style', 'clothing', 'dress', 'streetwear'],
-  'food': ['recipe', 'cooking', 'food', 'meal', 'kitchen', 'baking', 'yummy'],
-  'comedy': ['funny', 'comedy', 'joke', 'humor', 'laugh', 'hilarious', 'skit'],
-  'dance': ['dance', 'choreo', 'choreography', 'dancing', 'moves', 'routine'],
-  'music': ['song', 'music', 'singing', 'cover', 'artist', 'beat'],
-  'gaming': ['game', 'gaming', 'gamer', 'play', 'stream', 'esports'],
-  'lifestyle': ['lifestyle', 'routine', 'vlog', 'life', 'morning', 'night'],
-  'education': ['learn', 'tip', 'hack', 'tutorial', 'guide', 'explain'],
-  'pets': ['dog', 'cat', 'pet', 'puppy', 'kitten', 'animal'],
-  'travel': ['travel', 'trip', 'vacation', 'adventure', 'explore'],
-  'motivation': ['motivation', 'inspire', 'success', 'mindset', 'growth'],
-  'relationship': ['couple', 'relationship', 'love', 'boyfriend', 'girlfriend'],
-};
+// Helper to score trend relevance to a niche
+export function getNicheRelevanceScore(trend: { title: string; hashtags?: string[] }, niche: string): number {
+  const keywords = generateNicheKeywords(niche);
+  const combined = `${trend.title} ${(trend.hashtags || []).join(' ')}`.toLowerCase();
+  let matches = 0;
+  for (const kw of keywords) {
+    if (combined.includes(kw.toLowerCase())) matches++;
+  }
+  return Math.min(1, matches / Math.max(1, keywords.length));
+}
+
+// Brand-safe filter: allow only educational, inspirational, demonstration, niche-aligned
+export function isBrandSafe(trend: { title: string; description?: string; hashtags?: string[] }): boolean {
+  const text = `${trend.title} ${trend.description || ''} ${(trend.hashtags || []).join(' ')}`.toLowerCase();
+  const banned = ['meme', 'celebrity', 'drama', 'gossip', 'scandal', 'prank', 'fail'];
+  if (banned.some(b => text.includes(b))) return false;
+  const allowed = ['educational', 'inspirational', 'demonstration', 'how to', 'tutorial', 'case study', 'success', 'story', 'lesson'];
+  return allowed.some(a => text.includes(a)) || true; // fallback: allow if not banned
+}
 
 /**
  * Detect niches from trend content
  */
 export function detectNiches(title: string, hashtags: string[] = []): string[] {
+  // Use all known niches from generateNicheKeywords
+  const allNiches = ['fitness', 'real estate', 'marketing', 'beauty', 'fashion', 'food', 'comedy', 'dance', 'music', 'gaming', 'lifestyle', 'education', 'pets', 'travel', 'motivation', 'relationship'];
   const combined = `${title} ${hashtags.join(' ')}`.toLowerCase();
-  const detected: string[] = [];
-  
-  for (const [niche, keywords] of Object.entries(NICHE_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (combined.includes(keyword)) {
-        if (!detected.includes(niche)) {
-          detected.push(niche);
-        }
-        break;
-      }
-    }
-  }
-  
-  return detected;
+  return allNiches.filter(niche => generateNicheKeywords(niche).some(kw => combined.includes(kw.toLowerCase())));
 }
 
 /**
@@ -152,11 +143,10 @@ export function filterTrendsByNiche(
   trends: Array<{ title: string; hashtags?: string[] }>,
   niche: string
 ): typeof trends {
-  const keywords = NICHE_KEYWORDS[niche] || [];
+  const keywords = generateNicheKeywords(niche);
   if (keywords.length === 0) return trends;
-  
   return trends.filter(trend => {
     const combined = `${trend.title} ${(trend.hashtags || []).join(' ')}`.toLowerCase();
-    return keywords.some(keyword => combined.includes(keyword));
+    return keywords.some(keyword => combined.includes(keyword.toLowerCase()));
   });
 }

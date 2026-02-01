@@ -12,6 +12,8 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { generateNicheKeywords } from '../lib/generateNicheKeywords';
+import { getNicheRelevanceScore, detectNiches, isBrandSafe } from './trendScraperService';
 
 // ============================================================================
 // TYPES
@@ -304,7 +306,10 @@ function calculateViralScore(
 // MAIN ANALYSIS FUNCTION
 // ============================================================================
 
-export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
+/**
+ * Analyze a trend and score for niche relevance and brand safety
+ */
+export async function analyzeTrend(rawData: any, userNiche?: string): Promise<AnalyzedTrend & { nicheRelevanceScore: number; trend_niche_tags: string[]; brandSafe: boolean }> {
   console.log('[Analysis] Analyzing trend:', rawData.title);
   
   const title = rawData.title || '';
@@ -318,14 +323,22 @@ export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
   // Analyze hook
   const hook_style = analyzeHookStyle(title, description);
   
-  // Calculate score
-  const trend_score = calculateViralScore(
+  // Calculate scores
+  const viralScore = calculateViralScore(
     rawData.views,
     rawData.likes,
     rawData.shares,
     rawData.comments,
     platform
   );
+  const niche = userNiche || rawData.niche;
+  const nicheRelevanceScore = niche ? getNicheRelevanceScore(rawData, niche) : 0;
+  const engagementScore = rawData.likes && rawData.views ? Math.min(1, rawData.likes / rawData.views) : 0;
+  const finalTrendScore = Math.round(
+    (viralScore * 0.6) + (engagementScore * 100 * 0.2) + (nicheRelevanceScore * 100 * 0.2)
+  );
+  const trend_niche_tags = detectNiches(title, rawData.hashtags);
+  const brandSafe = isBrandSafe(rawData);
   
   // Analyze pacing
   const pacing_pattern = analyzePacing(platform, rawData.duration, format_type);
@@ -353,7 +366,7 @@ export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
     source_url: rawData.source_url,
     format_type,
     hook_style,
-    trend_score,
+    trend_score: finalTrendScore,
     avg_duration: rawData.duration,
     duration_range_min: rawData.duration ? Math.max(rawData.duration - 10, 10) : undefined,
     duration_range_max: rawData.duration ? rawData.duration + 10 : undefined,
@@ -367,6 +380,9 @@ export async function analyzeTrend(rawData: any): Promise<AnalyzedTrend> {
     likes: rawData.likes,
     shares: rawData.shares,
     comments: rawData.comments,
+    nicheRelevanceScore,
+    trend_niche_tags,
+    brandSafe,
   };
 }
 
@@ -412,6 +428,8 @@ export async function processRawTrends(limit: number = 50): Promise<number> {
           duration_range_max: analyzed.duration_range_max,
           hook_style: analyzed.hook_style,
           audio_name: analyzed.audio_name,
+          trend_niche_tags: analyzed.trend_niche_tags,
+          brand_safe: analyzed.brandSafe,
         })
         .select()
         .single();
