@@ -1,7 +1,7 @@
 // /services/zapierWebhookService.ts
 
 // Zapier webhook endpoint for publishing to Buffer
-const ZAPIER_WEBHOOK_URL = process.env.VITE_ZAPIER_WEBHOOK_URL || 'https://hooks.zapier.com/hooks/catch/26258261/ul1b4v1/';
+const ZAPIER_WEBHOOK_URL = import.meta.env.VITE_ZAPIER_WEBHOOK_URL || 'https://hooks.zapier.com/hooks/catch/26258261/ul1b4v1/';
 
 /**
  * Sends a post to Buffer using the Zapier webhook.

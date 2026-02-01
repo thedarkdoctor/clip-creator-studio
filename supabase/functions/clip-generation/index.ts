@@ -2,7 +2,6 @@
 // Processes long-form video into short clips based on selected trends
 // Analyzes trend examples and extracts pacing, timing, and style
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY') || '';
@@ -52,7 +51,7 @@ interface ClipSpec {
   additional_media_urls?: string[];
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
   }
@@ -528,31 +527,27 @@ async function processVideoAndCreateClips(
   // 4. Create database records with storage paths
 
   for (const spec of clipSpecs) {
-    // Generate storage path for clip
-    const clipStoragePath = `clips/${videoId}/${spec.platform_id}_${Date.now()}_${spec.start_time}.mp4`;
-
-    // Store enhanced metadata
-    const clipData: any = {
+    // Only insert columns that exist in the generated_clips table schema
+    // Per schema: id, video_id, platform_id, duration_seconds, caption, hashtags, created_at
+    const clipData = {
       video_id: videoId,
       platform_id: spec.platform_id,
       duration_seconds: spec.duration,
       caption: spec.caption,
       hashtags: spec.hashtags,
-      storage_path: clipStoragePath,
-      start_time_seconds: spec.start_time,
-      end_time_seconds: spec.end_time,
     };
 
-    // Add enhanced metadata if available
-    if (spec.font_style) {
-      clipData.font_style = spec.font_style; // Store as JSONB or separate columns
-    }
-    if (spec.background_music_url) {
-      clipData.background_music_url = spec.background_music_url;
-    }
-    if (spec.additional_media_urls) {
-      clipData.additional_media_urls = spec.additional_media_urls; // Store as JSONB array
-    }
+    // Note: Additional metadata (font_style, background_music_url, additional_media_urls,
+    // storage_path, start_time_seconds, end_time_seconds) is computed but not persisted
+    // because these columns don't exist in the current schema. To enable full storage,
+    // a database migration would be required to add these columns.
+    console.log(`[ClipGen] Creating clip with metadata:`, {
+      ...clipData,
+      start_time: spec.start_time,
+      end_time: spec.end_time,
+      font_style: spec.font_style,
+      background_music_url: spec.background_music_url,
+    });
 
     const { data: clip, error } = await supabase
       .from('generated_clips')
