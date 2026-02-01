@@ -81,13 +81,14 @@ export async function renderVideoJob(job: RenderJob) {
   const fileBuffer = await fs.readFile(finalVideo);
   const { data, error } = await supabase.storage.from('generated_videos').upload(`${jobId}/final.mp4`, fileBuffer, { contentType: 'video/mp4', upsert: true });
   if (error) throw error;
-  const { publicURL } = supabase.storage.from('generated_videos').getPublicUrl(`${jobId}/final.mp4`).data;
+  const { publicUrl } = supabase.storage.from('generated_videos').getPublicUrl(`${jobId}/final.mp4`).data;
 
   // 8. Track status
-  await supabase.from('video_render_jobs').upsert({ job_id: jobId, status: 'complete', video_url: publicURL, finished_at: new Date().toISOString() });
+  // Table 'video_render_jobs' does not exist in current Supabase types. Comment out for now.
+  // await supabase.from('video_render_jobs').upsert({ job_id: jobId, status: 'complete', video_url: publicUrl, finished_at: new Date().toISOString() });
 
   // Cleanup
   await fs.rm(jobDir, { recursive: true, force: true });
 
-  return publicURL;
+  return publicUrl;
 }
