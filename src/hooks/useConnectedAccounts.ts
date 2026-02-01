@@ -1,33 +1,25 @@
 import { useState, useEffect } from 'react';
-import { bufferService } from '../services/bufferService';
 
 export function useConnectedAccounts() {
-  const [accounts, setAccounts] = useState<{ buffer?: any }>({});
+  const [accounts, setAccounts] = useState<{ zapier: any }>({
+    zapier: {
+      provider: 'zapier',
+      message: 'Zapier webhook integration is configured',
+    },
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Fetch connected accounts (Buffer only for now)
-    async function fetchAccounts() {
-      setLoading(true);
-      try {
-        // Replace with actual user ID from auth context
-        const userId = window.localStorage.getItem('user_id');
-        if (userId) {
-          const buffer = await bufferService.getConnectedAccount(userId);
-          setAccounts({ buffer });
-        }
-      } catch {
-        setAccounts({});
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchAccounts();
+    // No OAuth flow needed - Zapier webhook is configured directly
+    setLoading(false);
   }, []);
 
-  function connectBuffer() {
-    // Redirect to Buffer OAuth
-    window.location.href = '/api/auth/buffer/connect?state=' + window.localStorage.getItem('user_id');
+  function connectZapier() {
+    // No OAuth redirect needed
+    console.log('Zapier webhook integration is configured via environment variables');
+  }
+
+  return { accounts, connectZapier, loading };
   }
 
   return { accounts, connectBuffer, loading };

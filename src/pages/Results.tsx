@@ -6,7 +6,7 @@ import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
 import { ClipCard } from '@/components/ClipCard';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLatestVideo, useGeneratedClips, useScheduleToBuffer, useBufferPosts } from '@/hooks/useSupabaseData';
+import { useLatestVideo, useGeneratedClips, useScheduleToBuffer } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -35,7 +35,6 @@ export default function Results() {
   const { data: latestVideo, isLoading: videoLoading } = useLatestVideo();
   const { data: clips, isLoading: clipsLoading } = useGeneratedClips(videoId || undefined);
   const scheduleToBuffer = useScheduleToBuffer();
-  const { data: bufferPosts } = useBufferPosts(selectedClips.length > 0 ? selectedClips : undefined);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -75,8 +74,6 @@ export default function Results() {
     const seconds = clip.duration_seconds % 60;
     const duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     
-    const bufferPost = bufferPosts?.find((bp) => bp.clip_id === clip.id);
-    
     return {
       id: clip.id,
       platform,
@@ -84,7 +81,6 @@ export default function Results() {
       thumbnail: '/placeholder.svg',
       caption: clip.caption || '',
       hashtags: clip.hashtags || [],
-      bufferPost,
     };
   }) || [];
 

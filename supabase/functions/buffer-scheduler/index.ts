@@ -1,5 +1,5 @@
 // Supabase Edge Function: buffer-scheduler
-// Schedules posts to Buffer API
+// Schedules posts for publishing via Zapier webhook
 // Handles posting frequency and UTC-based scheduling
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -9,9 +9,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const BUFFER_API_URL = 'https://api.bufferapp.com/1';
-const BUFFER_ACCESS_TOKEN = Deno.env.get('BUFFER_ACCESS_TOKEN') || '';
 
 interface ScheduleRequest {
   user_id: string;
@@ -24,11 +21,10 @@ interface ScheduleRequest {
   start_date?: string; // ISO date string, defaults to tomorrow
 }
 
-interface BufferPost {
+interface ScheduledPost {
   clip_id: string;
-  buffer_post_id?: string | null;
   scheduled_at: string;
-  status: 'pending' | 'scheduled' | 'published' | 'failed';
+  status: 'pending' | 'published' | 'failed';
   error_message?: string;
 }
 
