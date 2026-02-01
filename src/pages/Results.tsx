@@ -198,11 +198,6 @@ export default function Results() {
                     >
                       {isSelected ? <CheckCircle2 size={20} /> : <Plus size={20} />}
                     </div>
-                    {clip.bufferPost && (
-                      <div className="absolute top-2 left-2 z-10 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                        Scheduled
-                      </div>
-                    )}
                     <ClipCard clip={clip} />
                   </div>
                 );
