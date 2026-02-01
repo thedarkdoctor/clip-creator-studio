@@ -284,8 +284,7 @@ export function useCreateVideo() {
     mutationFn: async (data: {
       fileName: string;
       storagePath: string;
-      fileSize: number;
-      durationSeconds?: number;
+      fileSize?: number;
     }) => {
       if (!user) throw new Error('Not authenticated');
       
@@ -295,8 +294,6 @@ export function useCreateVideo() {
           user_id: user.id,
           file_name: data.fileName,
           storage_path: data.storagePath,
-          file_size: data.fileSize,
-          duration_seconds: data.durationSeconds,
           status: 'uploaded',
         })
         .select()
