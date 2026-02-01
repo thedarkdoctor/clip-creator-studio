@@ -1,11 +1,11 @@
 // /services/zapierWebhookService.ts
 
-// Buffer API endpoint for scheduling posts
-const BUFFER_UPDATE_URL = process.env.BUFFER_UPDATE_URL || 'https://api.bufferapp.com/1/updates/create.json';
+// Zapier webhook endpoint for publishing to Buffer
+const ZAPIER_WEBHOOK_URL = process.env.VITE_ZAPIER_WEBHOOK_URL || 'https://hooks.zapier.com/hooks/catch/26258261/ul1b4v1/';
 
 /**
- * Schedules a post to Buffer using the Buffer API.
- * The URL is securely managed via env (BUFFER_UPDATE_URL).
+ * Sends a post to Buffer using the Zapier webhook.
+ * The webhook URL is securely managed via env (VITE_ZAPIER_WEBHOOK_URL).
  */
 export async function sendToZapierForPublishing({
   customer_id,
@@ -22,15 +22,16 @@ export async function sendToZapierForPublishing({
   caption: string;
   scheduled_time: string | null;
 }) {
-  // Build Buffer API payload
+  // Build payload for Zapier webhook
   const payload = {
-    profile_ids: [buffer_profile_id],
-    text: caption,
-    media: { video: video_url },
-    scheduled_at: scheduled_time || undefined,
-    shorten: false,
+    customer_id,
+    buffer_access_token,
+    buffer_profile_id,
+    video_url,
+    caption,
+    scheduled_time: scheduled_time || undefined,
   };
-  const resp = await fetch(`${BUFFER_UPDATE_URL}?access_token=${encodeURIComponent(buffer_access_token)}`, {
+  const resp = await fetch(ZAPIER_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
