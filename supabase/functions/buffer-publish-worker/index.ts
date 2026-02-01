@@ -5,9 +5,43 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { sendToZapierForPublishing } from '../../src/services/zapierWebhookService';
 
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+// Helper: Send to Zapier for Buffer publishing
+async function sendToZapierForPublishing({
+  customer_id,
+  buffer_access_token,
+  buffer_profile_id,
+  video_url,
+  caption,
+  scheduled_time,
+}: {
+  customer_id: string;
+  buffer_access_token: string;
+  buffer_profile_id: string;
+  video_url: string;
+  caption: string;
+  scheduled_time: string;
+}) {
+  const BUFFER_UPDATE_URL = process.env.BUFFER_UPDATE_URL || 'https://api.bufferapp.com/1/updates/create.json';
+  const resp = await fetch(`${BUFFER_UPDATE_URL}?access_token=${encodeURIComponent(buffer_access_token)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profile_ids: [buffer_profile_id],
+      text: caption,
+      media: { video: video_url },
+      scheduled_at: scheduled_time || undefined,
+      shorten: false,
+    }),
+  });
+  if (!resp.ok) {
+    const error = await resp.text();
+    throw new Error('Failed to schedule Buffer post: ' + error);
+  }
+  return true;
+}
 
 export async function handler(req: any) {
   console.log('[BufferWorker] Starting publish cycle...');
