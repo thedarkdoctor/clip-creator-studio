@@ -10,13 +10,13 @@ Add these to Lynkscope's environment configuration:
 
 ```env
 # Cliplyst API Integration
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
 
 # Lynkscope ↔ Cliplyst Shared Credentials
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
 
 # Session Token Signing
-JWT_SECRET=0123456789abcdef0123456789abcdef
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 **Where to get these values:**
@@ -85,7 +85,7 @@ Content-Type: application/json
 **Example**:
 ```bash
 curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" \
+  -H "Authorization: Bearer <your-lynkscope-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "lynkscope-user-123",
@@ -137,7 +137,7 @@ Authorization: Bearer VITE_LYNKSCOPE_INTERNAL_KEY
 **Example**:
 ```bash
 curl -X GET https://cliplyst-content-maker.onrender.com/api/jobs/550e8400-e29b-41d4-a716-446655440000 \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+  -H "Authorization: Bearer <your-lynkscope-key>"
 ```
 
 **Response (200 OK)**:
@@ -198,9 +198,9 @@ Contact Cliplyst team and request:
 
 ```bash
 # Update .env or deployment platform environment:
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 ### Step 3: Implement Job Creation

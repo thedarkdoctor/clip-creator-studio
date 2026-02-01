@@ -11,9 +11,9 @@
 ### ✅ Required Environment Variables (3)
 
 ```env
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 **Where to get these:**

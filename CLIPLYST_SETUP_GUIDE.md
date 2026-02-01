@@ -27,7 +27,7 @@ This is the shared secret for API authentication between Lynkscope and Cliplyst.
 openssl rand -hex 16
 
 # Example output:
-# a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+# <save-this-as-VITE_LYNKSCOPE_INTERNAL_KEY>
 ```
 
 **Store this value as: `VITE_LYNKSCOPE_INTERNAL_KEY`**
@@ -40,7 +40,7 @@ For signing session tokens between systems.
 openssl rand -hex 16
 
 # Example output:
-# 0123456789abcdef0123456789abcdef
+# <save-this-as-JWT_SECRET>
 ```
 
 **Store this value as: `JWT_SECRET`**
@@ -65,9 +65,9 @@ Add these to your Cliplyst deployment platform (Render, Vercel, Heroku, etc.):
 
 ```env
 # Lynkscope Integration
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 
 # External APIs (if not already configured)
 OPENAI_API_KEY=sk-...
@@ -83,7 +83,7 @@ BUFFER_ENCRYPTION_KEY=...
 
 # Supabase
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGc...
+VITE_SUPABASE_ANON_KEY=...
 ```
 
 ### Step 2.2: Deploy Cliplyst
@@ -126,9 +126,9 @@ Add these to Lynkscope's deployment platform:
 
 ```env
 # Cliplyst Integration
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 ### Step 3.2: Deploy Lynkscope
@@ -208,7 +208,7 @@ From Lynkscope, submit a content creation request:
 
 ```bash
 curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" \
+  -H "Authorization: Bearer <your-lynkscope-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "lynkscope-user-001",
@@ -232,7 +232,7 @@ curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content
 
 ```bash
 curl -X GET https://cliplyst-content-maker.onrender.com/api/jobs/550e8400-e29b-41d4-a716-446655440000 \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+  -H "Authorization: Bearer <your-lynkscope-key>"
 
 # Expected response:
 {
@@ -302,7 +302,7 @@ Look for:
 ```bash
 # Test with correct token
 curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" \
+  -H "Authorization: Bearer <your-lynkscope-key>" \
   ...
 ```
 

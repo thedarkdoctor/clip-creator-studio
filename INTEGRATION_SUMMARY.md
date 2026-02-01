@@ -23,7 +23,7 @@
 
 ```bash
 openssl rand -hex 16
-# Output: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+# Output: <save-as-VITE_LYNKSCOPE_INTERNAL_KEY>
 
 # Save this as VITE_LYNKSCOPE_INTERNAL_KEY
 ```
@@ -32,7 +32,7 @@ openssl rand -hex 16
 
 ```bash
 openssl rand -hex 16
-# Output: 0123456789abcdef0123456789abcdef
+# Output: <save-as-JWT_SECRET>
 
 # Save this as JWT_SECRET
 ```
@@ -45,9 +45,9 @@ openssl rand -hex 16
 
 ```env
 # Lynkscope Integration
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 
 # External APIs (Content Generation)
 OPENAI_API_KEY=sk-...
@@ -59,21 +59,21 @@ JAMENDO_CLIENT_SECRET=...
 # Buffer Integration (Social Media Publishing)
 BUFFER_CLIENT_ID=...
 BUFFER_CLIENT_SECRET=...
-BUFFER_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
+BUFFER_ENCRYPTION_KEY=...
 
 # Supabase (Database)
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGc...
-VITE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
+VITE_SUPABASE_ANON_KEY=...
+VITE_SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 ### For Lynkscope (.env or environment variables):
 
 ```env
 # Cliplyst Integration (MUST match Cliplyst values)
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 ---
@@ -87,9 +87,9 @@ JWT_SECRET=0123456789abcdef0123456789abcdef
 # (Render, Vercel, Heroku, etc.)
 
 # Set these values:
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 
 # Redeploy
 git push origin main
@@ -109,9 +109,9 @@ curl https://cliplyst-content-maker.onrender.com/api/health
 # Add environment variables to Lynkscope deployment platform
 
 # Set these values (MUST match Cliplyst):
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 
 # Redeploy
 git push origin main
@@ -135,7 +135,7 @@ curl https://cliplyst-content-maker.onrender.com/api/health
 
 # Test 2: Create Content Job
 curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6" \
+  -H "Authorization: Bearer <your-lynkscope-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "test-user",
@@ -149,7 +149,7 @@ curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content
 
 # Test 3: Poll Job Status
 curl -X GET https://cliplyst-content-maker.onrender.com/api/jobs/JOB_ID \
-  -H "Authorization: Bearer a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+  -H "Authorization: Bearer <your-lynkscope-key>"
 ```
 
 ---

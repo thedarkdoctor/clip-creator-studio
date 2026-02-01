@@ -37,7 +37,7 @@ BUFFER_REDIRECT_URI=https://yourdomain.com/api/auth/buffer/callback
 LYNKSCOPE_INTERNAL_KEY=your-secret-key
 
 # Token Encryption (generate 32-char hex)
-BUFFER_ENCRYPTION_KEY=a1b2c3d4e5f6789...
+BUFFER_ENCRYPTION_KEY=<your-encryption-key-here>
 
 # Optional Overrides
 BUFFER_UPDATE_URL=https://api.bufferapp.com

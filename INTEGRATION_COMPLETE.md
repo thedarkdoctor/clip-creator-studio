@@ -53,13 +53,13 @@
 
 ```env
 # 1. Cliplyst API URL (provided by Cliplyst team)
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
 
-# 2. Shared authentication key (generate: openssl rand -hex 16)
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+# 2. Shared authentication key (Cliplyst will provide this)
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
 
-# 3. JWT secret (generate: openssl rand -hex 16)
-JWT_SECRET=0123456789abcdef0123456789abcdef
+# 3. JWT secret (Cliplyst will provide this)
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 ### One Configuration Request
@@ -94,14 +94,14 @@ Response: 200 OK with service status
 ### Endpoint 2: Create Content Job
 ```
 POST /api/jobs/create-content
-Authorization: Bearer VITE_LYNKSCOPE_INTERNAL_KEY
+Authorization: Bearer <your-lynkscope-key>
 Response: 202 Accepted with job_id
 ```
 
 ### Endpoint 3: Get Job Status
 ```
 GET /api/jobs/{jobId}
-Authorization: Bearer VITE_LYNKSCOPE_INTERNAL_KEY
+Authorization: Bearer <your-lynkscope-key>
 Response: 200 OK with job status and videos
 ```
 
@@ -135,13 +135,13 @@ curl https://cliplyst-content-maker.onrender.com/api/health
 
 # Test 2: Create job
 curl -X POST https://cliplyst-content-maker.onrender.com/api/jobs/create-content \
-  -H "Authorization: Bearer YOUR_KEY" \
+  -H "Authorization: Bearer <your-lynkscope-key>" \
   -H "Content-Type: application/json" \
   -d '{payload}'
 
 # Test 3: Get status
 curl https://cliplyst-content-maker.onrender.com/api/jobs/JOB_ID \
-  -H "Authorization: Bearer YOUR_KEY"
+  -H "Authorization: Bearer <your-lynkscope-key>"
 ```
 
 ---

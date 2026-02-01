@@ -56,12 +56,12 @@
 
 **2. VITE_LYNKSCOPE_INTERNAL_KEY**
 - What: Shared authentication key (32-char hex string)
-- Example: `a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6`
+- Example: `<provided-by-cliplyst-team>`
 - Source: Cliplyst team generates this
 
 **3. JWT_SECRET**
 - What: JWT signing secret (32-char hex string)
-- Example: `0123456789abcdef0123456789abcdef`
+- Example: `<provided-by-cliplyst-team>`
 - Source: Cliplyst team generates this
 
 ### ✅ Domain Whitelisting
@@ -109,9 +109,9 @@ Request the following from Cliplyst team:
 ### Step 2: Configure Environment
 ```env
 # Add to .env
-VITE_CLIPLYST_API_URL=https://cliplyst-content-maker.onrender.com
-VITE_LYNKSCOPE_INTERNAL_KEY=a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
-JWT_SECRET=0123456789abcdef0123456789abcdef
+VITE_CLIPLYST_API_URL=<provided-by-cliplyst-team>
+VITE_LYNKSCOPE_INTERNAL_KEY=<provided-by-cliplyst-team>
+JWT_SECRET=<provided-by-cliplyst-team>
 ```
 
 ### Step 3: Implement API Calls
