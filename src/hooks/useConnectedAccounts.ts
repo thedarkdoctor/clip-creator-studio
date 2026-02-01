@@ -20,7 +20,4 @@ export function useConnectedAccounts() {
   }
 
   return { accounts, connectZapier, loading };
-  }
-
-  return { accounts, connectBuffer, loading };
 }
