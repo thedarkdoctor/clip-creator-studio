@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      content_jobs: {
+        Row: {
+          auto_schedule: boolean | null
+          company_name: string
+          created_at: string
+          error_message: string | null
+          id: string
+          niche: string
+          posting_frequency: string | null
+          progress: Json | null
+          status: string | null
+          top_opportunities: string[] | null
+          updated_at: string
+          user_id: string
+          weak_platforms: string[] | null
+        }
+        Insert: {
+          auto_schedule?: boolean | null
+          company_name: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche: string
+          posting_frequency?: string | null
+          progress?: Json | null
+          status?: string | null
+          top_opportunities?: string[] | null
+          updated_at?: string
+          user_id: string
+          weak_platforms?: string[] | null
+        }
+        Update: {
+          auto_schedule?: boolean | null
+          company_name?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          niche?: string
+          posting_frequency?: string | null
+          progress?: Json | null
+          status?: string | null
+          top_opportunities?: string[] | null
+          updated_at?: string
+          user_id?: string
+          weak_platforms?: string[] | null
+        }
+        Relationships: []
+      }
       generated_clips: {
         Row: {
           caption: string | null
