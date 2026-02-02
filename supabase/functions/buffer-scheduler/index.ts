@@ -24,9 +24,16 @@ interface ScheduleRequest {
 interface ScheduledPost {
   clip_id: string;
   scheduled_at: string;
-  status: 'pending' | 'published' | 'failed';
+  status: 'pending' | 'published' | 'failed' | 'scheduled';
   error_message?: string;
 }
+
+interface BufferPost extends ScheduledPost {
+  buffer_post_id?: string | null;
+}
+
+const BUFFER_ACCESS_TOKEN = Deno.env.get('BUFFER_ACCESS_TOKEN') || '';
+const BUFFER_API_URL = 'https://api.bufferapp.com/1';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

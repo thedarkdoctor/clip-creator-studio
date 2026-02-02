@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useConnectedAccounts } from '../hooks/useConnectedAccounts';
 
 export default function ConnectedPlatforms() {
-  const { accounts, connectBuffer, loading } = useConnectedAccounts();
+  const { accounts, connectZapier, loading } = useConnectedAccounts();
 
   return (
     <div className="max-w-xl mx-auto p-6">
@@ -10,14 +10,14 @@ export default function ConnectedPlatforms() {
       <div className="mb-6">
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          onClick={connectBuffer}
+          onClick={connectZapier}
           disabled={loading}
         >
-          {accounts.buffer ? 'Buffer Connected' : 'Connect Buffer'}
+          {accounts.zapier ? 'Zapier Connected' : 'Connect Zapier'}
         </button>
-        {accounts.buffer && (
+        {accounts.zapier && (
           <div className="mt-2 text-green-700">
-            Connected as: <b>{accounts.buffer.buffer_profile_name}</b>
+            Status: <b>{accounts.zapier.message}</b>
           </div>
         )}
       </div>
