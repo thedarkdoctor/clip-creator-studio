@@ -17,3 +17,12 @@ verify_jwt = false
 
 [functions.metrics-updater-worker]
 verify_jwt = false
+
+[functions.lynkscope-health]
+verify_jwt = false
+
+[functions.lynkscope-create-job]
+verify_jwt = false
+
+[functions.lynkscope-job-status]
+verify_jwt = false
