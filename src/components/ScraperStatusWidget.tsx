@@ -1,15 +1,77 @@
 /**
  * Scraper Status Widget
- * Shows health of trend scrapers
+ * Shows health of trend scrapers with manual trigger capability
  */
 
-import { Activity, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Activity, CheckCircle, XCircle, Clock, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { useScraperStatus } from '@/hooks/useTrendIntelligence';
+import { useUserProfile, useUserPlatforms, usePlatforms } from '@/hooks/useSupabaseData';
+import { triggerTrendScraper, runFullTrendDiscovery } from '@/services/trendScraperService';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function ScraperStatusWidget() {
   const { data: scrapers, isLoading, error } = useScraperStatus();
+  const { data: userProfile } = useUserProfile();
+  const { data: userPlatforms } = useUserPlatforms();
+  const { data: allPlatforms } = usePlatforms();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [isRunning, setIsRunning] = useState(false);
+
+  // Map user's selected platform IDs to platform names
+  const getSelectedPlatformNames = (): string[] => {
+    if (!userPlatforms || !allPlatforms) return [];
+    return userPlatforms
+      .map(up => allPlatforms.find(p => p.id === up.platform_id)?.name?.toLowerCase())
+      .filter((name): name is string => !!name);
+  };
+
+  const handleRunScraper = async () => {
+    setIsRunning(true);
+    
+    const platforms = getSelectedPlatformNames();
+    const niche = userProfile?.niche || '';
+    
+    toast({
+      title: 'Starting trend discovery',
+      description: `Scraping ${platforms.length > 0 ? platforms.join(', ') : 'all platforms'}${niche ? ` for ${niche}` : ''}...`,
+    });
+    
+    try {
+      const result = await runFullTrendDiscovery({ platforms, niche });
+      
+      if (result.success) {
+        toast({
+          title: 'Trends discovered!',
+          description: `Found ${result.scraped || 0} new trends, analyzed ${result.analyzed || 0}`,
+        });
+        
+        // Refresh trends and scraper status
+        queryClient.invalidateQueries({ queryKey: ['trends-v2'] });
+        queryClient.invalidateQueries({ queryKey: ['scraper-status'] });
+      } else {
+        toast({
+          title: 'Scraping issues',
+          description: result.error || result.errors?.join(', ') || 'Some platforms may have failed',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Scraper error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -27,7 +89,7 @@ export function ScraperStatusWidget() {
     );
   }
 
-  if (error || !scrapers) {
+  if (error) {
     return (
       <div className="glass-card rounded-lg p-4 border-destructive/50">
         <div className="flex items-center gap-2 text-sm text-destructive">
@@ -68,6 +130,8 @@ export function ScraperStatusWidget() {
     return 'text-destructive';
   };
 
+  const platformNames = getSelectedPlatformNames();
+
   return (
     <div className="glass-card rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
@@ -75,10 +139,37 @@ export function ScraperStatusWidget() {
           <Activity size={18} className="text-primary" />
           Scraper Status
         </h3>
+        
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleRunScraper}
+          disabled={isRunning}
+          className="gap-2"
+        >
+          {isRunning ? (
+            <>
+              <Loader2 size={14} className="animate-spin" />
+              Scraping...
+            </>
+          ) : (
+            <>
+              <RefreshCw size={14} />
+              Discover Trends
+            </>
+          )}
+        </Button>
       </div>
 
+      {platformNames.length > 0 && (
+        <div className="mb-3 text-xs text-muted-foreground">
+          Scraping: {platformNames.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
+          {userProfile?.niche && ` • ${userProfile.niche}`}
+        </div>
+      )}
+
       <div className="space-y-3">
-        {scrapers.map((scraper) => (
+        {scrapers && scrapers.map((scraper) => (
           <div
             key={scraper.id}
             className="flex items-center justify-between p-2 rounded bg-secondary/30"
@@ -86,7 +177,7 @@ export function ScraperStatusWidget() {
             <div className="flex items-center gap-2">
               {getStatusIcon(scraper)}
               <span className="text-sm font-medium capitalize">
-                {scraper.scraper_name.replace(/_/g, ' ')}
+                {scraper.scraper_name.replace(/_/g, ' ').replace('rapidapi ', '')}
               </span>
             </div>
 
@@ -113,9 +204,9 @@ export function ScraperStatusWidget() {
         ))}
       </div>
 
-      {scrapers.length === 0 && (
+      {(!scrapers || scrapers.length === 0) && (
         <div className="text-center py-4 text-sm text-muted-foreground">
-          No scrapers configured yet
+          No scrapers have run yet. Click "Discover Trends" to start.
         </div>
       )}
     </div>
