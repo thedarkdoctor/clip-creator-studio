@@ -1,6 +1,7 @@
 /**
  * Trend Intelligence Hooks
  * Production-ready React hooks for trend data fetching
+ * Now includes strategy-aware scoring using marketing intelligence
  * 
  * NOTE: These hooks use type assertions because the Supabase types
  * are auto-generated and may not yet include the new trend_v2 tables.
@@ -10,6 +11,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { TrendV2, EnhancedTrend, ScraperStatus } from '@/types/trendIntelligence';
+import { useMarketingIntelligence } from './useMarketingIntelligence';
+import { applyStrategyBoostToScore } from '@/services/marketingStrategyService';
 
 // ============================================================================
 // TREND QUERIES
@@ -20,14 +23,18 @@ export interface TrendFilters {
   format_type?: 'pov' | 'transformation' | 'tutorial' | 'meme' | 'storytime' | 'relatable' | 'aesthetic' | 'challenge' | 'other';
   minScore?: number;
   searchQuery?: string;
+  applyStrategyBoost?: boolean;
 }
 
 /**
- * Fetch trends with optional filters
+ * Fetch trends with optional filters and strategy boost
  */
-export function useTrends(filters?: TrendFilters) {
+export function useTrends(filters?: TrendFilters, userNiche?: string | null) {
+  const { data: intelligence } = useMarketingIntelligence();
+  const applyBoost = filters?.applyStrategyBoost !== false; // Default to true
+
   return useQuery({
-    queryKey: ['trends-v2', filters],
+    queryKey: ['trends-v2', filters, intelligence?.id, userNiche],
     queryFn: async () => {
       console.log('[useTrends] Fetching trends with filters:', filters);
       
@@ -96,13 +103,40 @@ export function useTrends(filters?: TrendFilters) {
 
       console.log(`[useTrends] Fetched ${data?.length || 0} trends`);
       
-      // Transform to EnhancedTrend format
-      const enhanced: EnhancedTrend[] = (data || []).map((trend: any) => ({
-        ...trend,
-        metrics: trend.trend_metrics?.[0],
-        pattern: trend.trend_patterns?.[0],
-        hashtags: trend.trend_hashtags || [],
-      }));
+      // Transform to EnhancedTrend format with strategy boost
+      const enhanced: (EnhancedTrend & { strategyBoost?: any; boostedScore?: number })[] = (data || []).map((trend: any) => {
+        const baseTrend: EnhancedTrend = {
+          ...trend,
+          metrics: trend.trend_metrics?.[0],
+          pattern: trend.trend_patterns?.[0],
+          hashtags: trend.trend_hashtags || [],
+        };
+
+        // Apply strategy boost if intelligence is available
+        if (applyBoost && intelligence) {
+          const { finalScore, boost } = applyStrategyBoostToScore(
+            trend.trend_score,
+            trend.platform,
+            trend.title,
+            userNiche || intelligence.niche,
+            intelligence
+          );
+
+          return {
+            ...baseTrend,
+            strategyBoost: boost,
+            boostedScore: finalScore,
+          };
+        }
+
+        return baseTrend;
+      });
+
+      // Sort by boosted score if strategy was applied
+      if (applyBoost && intelligence) {
+        enhanced.sort((a, b) => (b.boostedScore || b.trend_score) - (a.boostedScore || a.trend_score));
+        console.log('[useTrends] Applied strategy boost from marketing intelligence');
+      }
 
       return enhanced;
     },
