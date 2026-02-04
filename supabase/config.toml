@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.lynkscope-job-status]
 verify_jwt = false
+
+[functions.lynkscope-sso]
+verify_jwt = false
+
+[functions.lynkscope-update-profile]
+verify_jwt = false

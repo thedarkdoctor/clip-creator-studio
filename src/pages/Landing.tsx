@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { ArrowRight, Play, Sparkles, Zap, Target, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
@@ -6,7 +7,22 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, lynkscopeUser, isLynkscopeSession, loading, signOut, businessName, niche } = useAuth();
+
+  // Auto-redirect for authenticated users (both Supabase and Lynkscope SSO)
+  useEffect(() => {
+    if (loading) return;
+    
+    const isAuthenticated = user || lynkscopeUser;
+    if (isAuthenticated) {
+      // If user has business/niche set, go to trends, otherwise brand-setup
+      if (businessName && niche) {
+        navigate('/trends');
+      } else {
+        navigate('/brand-setup');
+      }
+    }
+  }, [user, lynkscopeUser, loading, businessName, niche, navigate]);
 
   const features = [
     {
@@ -27,7 +43,7 @@ export default function Landing() {
   ];
 
   const handleGetStarted = () => {
-    if (user) {
+    if (user || lynkscopeUser) {
       navigate('/brand-setup');
     } else {
       navigate('/auth');
@@ -38,14 +54,33 @@ export default function Landing() {
     await signOut();
   };
 
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <Logo size="lg" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const isAuthenticated = user || lynkscopeUser;
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Logo size="sm" />
-          {user ? (
+          {isAuthenticated ? (
             <div className="flex items-center gap-3">
+              {isLynkscopeSession && (
+                <span className="text-xs text-muted-foreground px-2 py-1 bg-primary/10 rounded-full">
+                  via Lynkscope
+                </span>
+              )}
               <Button variant="outline" size="sm" onClick={() => navigate('/brand-setup')}>
                 Dashboard
               </Button>
@@ -92,7 +127,7 @@ export default function Landing() {
               onClick={handleGetStarted}
               className="group"
             >
-              {user ? 'Go to Dashboard' : 'Get Started Free'}
+              {isAuthenticated ? 'Go to Dashboard' : 'Get Started Free'}
               <ArrowRight className="group-hover:translate-x-1 transition-transform" />
             </Button>
             <Button variant="outline" size="xl">
