@@ -107,6 +107,45 @@ export type Database = {
           },
         ]
       }
+      marketing_intelligence: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          id: string
+          niche: string | null
+          platform_click_breakdown: Json | null
+          top_platform: string | null
+          total_clicks: number | null
+          underperforming_platforms: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          niche?: string | null
+          platform_click_breakdown?: Json | null
+          top_platform?: string | null
+          total_clicks?: number | null
+          underperforming_platforms?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          niche?: string | null
+          platform_click_breakdown?: Json | null
+          top_platform?: string | null
+          total_clicks?: number | null
+          underperforming_platforms?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platforms: {
         Row: {
           created_at: string

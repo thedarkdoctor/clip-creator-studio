@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.lynkscope-update-profile]
 verify_jwt = false
+
+[functions.marketing-intel]
+verify_jwt = false
