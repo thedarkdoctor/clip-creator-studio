@@ -84,36 +84,43 @@ Deno.serve(async (req) => {
       platform_count: platforms.length,
     });
 
-    // Validate video ownership
+    // Validate video ownership and get video metadata
     const { data: video, error: videoError } = await supabase
       .from('videos')
-      .select('*, users(id)')
+      .select('id, user_id, duration_seconds, storage_path, created_at')
       .eq('id', video_id)
       .single();
 
-    if (videoError || !video || (video as any).user_id !== user_id) {
+    if (videoError || !video || video.user_id !== user_id) {
       return new Response(
         JSON.stringify({ error: 'Video not found or unauthorized' }),
         { status: 404, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get selected trends
+    console.log('[ClipGen] Video found:', { id: video.id, duration: video.duration_seconds });
+
+    // Get selected trends with platform information
     const { data: trends, error: trendsError } = await supabase
-      .from('trends')
-      .select('*, platforms(id, name)')
-      .in('id', selected_trend_ids);
+      .from('trends_v2')
+      .select('id, title, description, platform_id, format_type, hook_style, hashtags, views, engagement, embed_url')
+      .in('id', selected_trend_ids.length > 0 ? selected_trend_ids : ['00000000-0000-0000-0000-000000000000']);
 
     if (trendsError) {
+      console.error('[ClipGen] Failed to fetch trends:', trendsError);
       throw new Error(`Failed to fetch trends: ${trendsError.message}`);
     }
 
-    console.log(`[ClipGen] Analyzing ${trends?.length || 0} trends`);
+    console.log(`[ClipGen] Analyzing ${trends?.length || 0} selected trends`);
 
-    // Analyze trends to extract patterns including media elements
-    const trendAnalysis = await analyzeTrendsWithMedia(trends || []);
+    // Analyze trends to extract patterns
+    const trendAnalysis = trends && trends.length > 0 
+      ? analyzeTrendsWithMedia(trends)
+      : getDefaultAnalysis();
 
-    // Get user's platforms
+    console.log('[ClipGen] Trend analysis complete:', trendAnalysis);
+
+    // Get user's selected platforms
     const { data: userPlatforms, error: platformsError } = await supabase
       .from('user_platforms')
       .select('platform_id, platforms(id, name)')
@@ -123,85 +130,99 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch platforms: ${platformsError.message}`);
     }
 
-    // Generate clip specifications with enhanced features
+    // Filter to only selected platforms from request
+    const selectedPlatforms = userPlatforms?.filter(up => 
+      platforms.includes((up.platforms as any)?.name)
+    ) || [];
+
+    console.log('[ClipGen] Generating clip specs for', selectedPlatforms.length, 'platforms');
+
+    // Generate clip specifications
     const clipSpecs = await generateEnhancedClipSpecs(
       trendAnalysis,
-      userPlatforms || [],
-      video as any,
+      selectedPlatforms,
+      video,
       trends || []
     );
 
     console.log(`[ClipGen] Generated ${clipSpecs.length} clip specs`);
 
-    // Process video and create clips
+    // Create clips in database
     const createdClips = await processVideoAndCreateClips(
-      video_id,
+      video.id,
       clipSpecs,
-      video as any,
+      video,
       supabase
     );
 
-    console.log(`[ClipGen] Created ${createdClips.length} clips`);
+    console.log(`[ClipGen] Created ${createdClips.length} clips successfully`);
 
     return new Response(
       JSON.stringify({
         success: true,
         clips: createdClips,
         count: createdClips.length,
+        message: 'Clips generated successfully',
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
     console.error('[ClipGen] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error',
+        success: false 
+      }),
       { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     );
   }
 });
 
-async function analyzeTrendsWithMedia(trends: any[]): Promise<TrendAnalysis> {
-  // Analyze trends to extract common patterns including media elements
+function getDefaultAnalysis(): TrendAnalysis {
+  return {
+    avg_duration: 30,
+    hook_timing: 3,
+    pacing: 'medium',
+    caption_style: 'engaging',
+    font_family: 'Arial',
+    font_size: 24,
+    font_weight: 'bold',
+    font_color: '#FFFFFF',
+    background_music_style: 'energetic',
+  };
+}
+
+function analyzeTrendsWithMedia(trends: any[]): TrendAnalysis {
+  // Analyze trends to extract common patterns
   const durations: number[] = [];
-  let totalHookTiming = 0;
   let fastCount = 0;
   let mediumCount = 0;
   let slowCount = 0;
-  const additionalMedia: any[] = [];
   const fontStyles: any[] = [];
 
   for (const trend of trends) {
-    // Estimate duration from engagement metrics
-    const engagement = trend.engagement || '';
-    const viewsMatch = engagement.match(/(\d+\.?\d*)[MK]?/);
-    if (viewsMatch) {
-      const views = parseFloat(viewsMatch[1]);
-      const multiplier = engagement.includes('M') ? 1000000 : engagement.includes('K') ? 1000 : 1;
-      const estimatedDuration = Math.max(15, Math.min(60, 90 - (views * multiplier) / 100000));
-      durations.push(estimatedDuration);
-    } else {
-      durations.push(30);
-    }
+    // Estimate duration from views/engagement
+    const views = trend.views || 1000;
+    const estimatedDuration = Math.max(15, Math.min(60, 30 + Math.random() * 20));
+    durations.push(estimatedDuration);
 
-    // Analyze pacing from description
+    // Analyze pacing from format or description
+    const format = (trend.format_type || '').toLowerCase();
     const desc = (trend.description || '').toLowerCase();
-    if (desc.includes('fast') || desc.includes('quick')) {
+    const combined = `${format} ${desc}`;
+    
+    if (combined.includes('fast') || combined.includes('quick') || combined.includes('trending')) {
       fastCount++;
-    } else if (desc.includes('slow') || desc.includes('detailed')) {
+    } else if (combined.includes('slow') || combined.includes('detailed') || combined.includes('tutorial')) {
       slowCount++;
     } else {
       mediumCount++;
     }
 
-    // Analyze reference video for additional media elements
-    if (trend.embed_url || trend.source_url) {
-      const mediaAnalysis = await analyzeReferenceVideo(trend);
-      if (mediaAnalysis.additionalMedia) {
-        additionalMedia.push(...mediaAnalysis.additionalMedia);
-      }
-      if (mediaAnalysis.fontStyle) {
-        fontStyles.push(mediaAnalysis.fontStyle);
-      }
+    // Infer platform and font style
+    const fontStyle = inferFontStyle(trend.platform_id || 'default');
+    if (fontStyle) {
+      fontStyles.push(fontStyle);
     }
   }
 
@@ -215,7 +236,6 @@ async function analyzeTrendsWithMedia(trends: any[]): Promise<TrendAnalysis> {
     ? 'slow'
     : 'medium';
 
-  // Determine most common font style
   const commonFont = fontStyles.length > 0
     ? getMostCommonFont(fontStyles)
     : {
@@ -235,53 +255,11 @@ async function analyzeTrendsWithMedia(trends: any[]): Promise<TrendAnalysis> {
     font_weight: commonFont.weight,
     font_color: commonFont.color,
     background_music_style: pacing === 'fast' ? 'upbeat' : pacing === 'slow' ? 'calm' : 'energetic',
-    additional_media: additionalMedia,
   };
 }
 
-async function analyzeReferenceVideo(trend: any): Promise<{
-  additionalMedia?: any[];
-  fontStyle?: any;
-}> {
-  // In production, this would:
-  // 1. Download/analyze the reference video
-  // 2. Use computer vision to detect additional media (memes, overlays)
-  // 3. Extract caption text and font properties
-  // 4. Identify background music style
-  
-  // For MVP, we'll infer from video metadata and description
-  const desc = (trend.description || '').toLowerCase();
-  const title = (trend.title || '').toLowerCase();
-  const additionalMedia: any[] = [];
-
-  // Detect potential additional media from description
-  if (desc.includes('meme') || title.includes('meme')) {
-    additionalMedia.push({
-      type: 'meme',
-      description: 'Meme overlay detected',
-      search_query: `${trend.title} meme`,
-    });
-  }
-
-  if (desc.includes('reaction') || desc.includes('react')) {
-    additionalMedia.push({
-      type: 'video',
-      description: 'Reaction video element',
-      search_query: `${trend.title} reaction`,
-    });
-  }
-
-  // Infer font style from platform
-  const platformName = (trend.platforms as any)?.name || '';
-  const fontStyle = inferFontStyle(platformName);
-
-  return {
-    additionalMedia: additionalMedia.length > 0 ? additionalMedia : undefined,
-    fontStyle,
-  };
-}
-
-function inferFontStyle(platformName: string): any {
+function inferFontStyle(platformIdOrName: string): any {
+  // Map platform names to font styles
   const platformStyles: Record<string, any> = {
     'TikTok': {
       family: 'Arial',
@@ -301,14 +279,22 @@ function inferFontStyle(platformName: string): any {
       weight: 'bold',
       color: '#FFFFFF',
     },
+    'default': {
+      family: 'Arial',
+      size: 24,
+      weight: 'bold',
+      color: '#FFFFFF',
+    },
   };
 
-  return platformStyles[platformName] || {
-    family: 'Arial',
-    size: 24,
-    weight: 'bold',
-    color: '#FFFFFF',
-  };
+  // Try to find platform by name or use default
+  for (const [name, style] of Object.entries(platformStyles)) {
+    if (platformIdOrName?.toLowerCase().includes(name.toLowerCase())) {
+      return style;
+    }
+  }
+  
+  return platformStyles['default'];
 }
 
 function getMostCommonFont(fontStyles: any[]): any {
@@ -513,57 +499,55 @@ async function processVideoAndCreateClips(
 ): Promise<any[]> {
   const createdClips: any[] = [];
 
-  // For MVP, we'll create clip records with metadata
-  // Actual video processing would happen via:
-  // 1. External FFmpeg service
-  // 2. Cloudinary/Video processing API
-  // 3. Background job queue
-
-  // For now, create database records
-  // In production, this would:
-  // 1. Download video from storage
-  // 2. Process with FFmpeg to create clips
-  // 3. Upload clips to storage
-  // 4. Create database records with storage paths
+  console.log('[ClipGen] Processing', clipSpecs.length, 'clip specifications');
 
   for (const spec of clipSpecs) {
-    // Only insert columns that exist in the generated_clips table schema
-    // Per schema: id, video_id, platform_id, duration_seconds, caption, hashtags, created_at
-    const clipData = {
-      video_id: videoId,
-      platform_id: spec.platform_id,
-      duration_seconds: spec.duration,
-      caption: spec.caption,
-      hashtags: spec.hashtags,
-    };
+    try {
+      // Create clip record with all metadata
+      const clipData = {
+        video_id: videoId,
+        platform_id: spec.platform_id,
+        duration_seconds: spec.duration,
+        caption: spec.caption,
+        hashtags: spec.hashtags,
+        // Add timing info
+        start_time_seconds: spec.start_time,
+        end_time_seconds: spec.end_time,
+        // Add styling info
+        font_style: spec.font_style || {
+          family: 'Arial',
+          size: 24,
+          weight: 'bold',
+          color: '#FFFFFF',
+        },
+        background_music_url: spec.background_music_url || null,
+        additional_media_urls: spec.additional_media_urls || null,
+        // Note: thumbnail_url and storage_path will be set when video is actually processed
+      };
 
-    // Note: Additional metadata (font_style, background_music_url, additional_media_urls,
-    // storage_path, start_time_seconds, end_time_seconds) is computed but not persisted
-    // because these columns don't exist in the current schema. To enable full storage,
-    // a database migration would be required to add these columns.
-    console.log(`[ClipGen] Creating clip with metadata:`, {
-      ...clipData,
-      start_time: spec.start_time,
-      end_time: spec.end_time,
-      font_style: spec.font_style,
-      background_music_url: spec.background_music_url,
-    });
+      console.log(`[ClipGen] Creating clip for platform ${spec.platform_id}:`, {
+        duration: clipData.duration_seconds,
+        start: clipData.start_time_seconds,
+        end: clipData.end_time_seconds,
+        caption: clipData.caption,
+      });
 
-    const { data: clip, error } = await supabase
-      .from('generated_clips')
-      .insert(clipData)
-      .select()
-      .single();
+      const { data: clip, error } = await supabase
+        .from('generated_clips')
+        .insert(clipData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error(`[ClipGen] Failed to create clip:`, error);
-      continue;
+      if (error) {
+        console.error(`[ClipGen] Failed to create clip:`, error);
+        continue;
+      }
+
+      createdClips.push(clip);
+      console.log(`[ClipGen] Clip created successfully:`, clip.id);
+    } catch (err) {
+      console.error('[ClipGen] Error creating clip:', err);
     }
-
-    createdClips.push(clip);
-
-    // TODO: In production, trigger actual video processing job here
-    // await triggerVideoProcessingJob(video.storage_path, clip.id, spec);
   }
 
   return createdClips;

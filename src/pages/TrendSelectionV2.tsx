@@ -14,6 +14,7 @@ import { TrendFiltersBar } from '@/components/TrendFiltersBar';
 import { ScraperStatusWidget } from '@/components/ScraperStatusWidget';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrends, type TrendFilters } from '@/hooks/useTrendIntelligence';
+import { useSaveUserTrends } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import type { EnhancedTrend } from '@/types/trendIntelligence';
 
@@ -23,6 +24,7 @@ export default function TrendSelectionV2() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const saveUserTrends = useSaveUserTrends();
   
   const [filters, setFilters] = useState<TrendFilters>({});
   const [selectedTrends, setSelectedTrends] = useState<Set<string>>(new Set());
@@ -58,9 +60,22 @@ export default function TrendSelectionV2() {
       return;
     }
 
-    // Store selected trends in session storage for next page
-    sessionStorage.setItem('selectedTrends', JSON.stringify(Array.from(selectedTrends)));
-    navigate('/upload');
+    try {
+      // Save selected trends to database
+      const selectedTrendIds = Array.from(selectedTrends);
+      await saveUserTrends.mutateAsync(selectedTrendIds);
+      
+      // Also store in session storage for reference
+      sessionStorage.setItem('selectedTrends', JSON.stringify(selectedTrendIds));
+      
+      navigate('/upload');
+    } catch (error: any) {
+      toast({
+        title: 'Error saving trends',
+        description: error.message || 'Failed to save your selected trends',
+        variant: 'destructive',
+      });
+    }
   };
 
   if (authLoading) {

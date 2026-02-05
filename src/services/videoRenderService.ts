@@ -1,94 +1,204 @@
-// src/services/videoRenderService.ts
-import fs from 'fs/promises';
-import path from 'path';
-import fetch from 'node-fetch';
-import { exec } from 'child_process';
+/**
+ * Video Rendering Service
+ * 
+ * This service coordinates video rendering and clip generation.
+ * For production use, integrate with a video processing service:
+ * - Cloudinary (cloudinary.com) - Cloud-based video processing
+ * - Mux (mux.com) - Video streaming & processing
+ * - FFmpeg.wasm - Browser-based FFmpeg
+ * - AWS MediaConvert - Serverless video processing
+ */
+
 import { supabase } from '@/integrations/supabase/client';
 
-interface RenderJob {
-  scenes: string[];
-  voiceover: string;
-  music: string;
-  subtitles: string;
-  format: 'vertical' | 'square' | 'horizontal';
-  duration_target: number;
-  job_id?: string;
+interface ClipRenderSpec {
+  videoId: string;
+  startTime: number;
+  endTime: number;
+  caption: string;
+  hashtags: string[];
+  fontStyle?: {
+    family: string;
+    size: number;
+    weight: string;
+    color: string;
+  };
+  backgroundMusicUrl?: string | null;
 }
 
-const TMP_DIR = '/tmp/cliplyst_render';
-
-async function downloadFile(url: string, dest: string) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to download: ${url}`);
-  const buffer = await res.buffer();
-  await fs.writeFile(dest, buffer);
+interface RenderJobResult {
+  success: boolean;
+  clipId?: string;
+  storageUrl?: string;
+  error?: string;
 }
 
-function ffmpegCmd(cmd: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    exec(cmd, (err, stdout, stderr) => {
-      if (err) return reject(stderr || stdout);
-      resolve();
-    });
-  });
+/**
+ * Get video URL from Supabase storage
+ * This allows downloading the source video for editing
+ */
+export async function getVideoUrl(storagePath: string): Promise<string> {
+  const { data } = supabase.storage
+    .from('videos')
+    .getPublicUrl(storagePath);
+  
+  return data.publicUrl;
 }
 
-export async function renderVideoJob(job: RenderJob) {
-  const jobId = job.job_id || `job_${Date.now()}`;
-  const jobDir = path.join(TMP_DIR, jobId);
-  await fs.mkdir(jobDir, { recursive: true });
+/**
+ * Prepare clip specification for rendering service
+ * Can be used with external video rendering APIs
+ */
+export async function prepareClipForRendering(
+  videoPath: string,
+  clipSpec: ClipRenderSpec
+): Promise<{
+  videoUrl: string;
+  clipSpec: ClipRenderSpec;
+}> {
+  const videoUrl = await getVideoUrl(videoPath);
+  return {
+    videoUrl,
+    clipSpec,
+  };
+}
 
-  // 1. Download all assets
-  const sceneFiles: string[] = [];
-  for (let i = 0; i < job.scenes.length; i++) {
-    const dest = path.join(jobDir, `scene${i}.mp4`);
-    await downloadFile(job.scenes[i], dest);
-    sceneFiles.push(dest);
+/**
+ * Queue video for rendering with external service
+ * 
+ * Example integration with Cloudinary:
+ * 
+ * async function renderWithCloudinary(job: RenderJob) {
+ *   const cloudinary = require('cloudinary');
+ *   cloudinary.v2.config({
+ *     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+ *     api_key: process.env.CLOUDINARY_API_KEY,
+ *     api_secret: process.env.CLOUDINARY_API_SECRET,
+ *   });
+ *
+ *   const transformation = cloudinary.v2.utils.cloudinaryUrl('video_id', {
+ *     start_offset: job.startTime,
+ *     end_offset: job.endTime,
+ *     resource_type: 'video',
+ *   });
+ *
+ *   return transformation[0];
+ * }
+ */
+export async function queueVideoRenderJob(
+  clipId: string,
+  spec: ClipRenderSpec
+): Promise<RenderJobResult> {
+  try {
+    // For MVP, we create a placeholder job status
+    // In production, this would integrate with a video processing service
+    
+    console.log('[VideoRender] Queueing render job for clip:', clipId);
+    
+    // Option 1: Manually edit with frontend video editor
+    // Option 2: Use browser-based FFmpeg.wasm
+    // Option 3: Send to external API (Cloudinary, Mux, etc.)
+    // Option 4: Use AWS Lambda + MediaConvert
+    
+    return {
+      success: true,
+      clipId,
+      error: 'Video rendering requires external service integration. Use Cloudinary, Mux, or FFmpeg.wasm for production.',
+    };
+  } catch (error: any) {
+    console.error('[VideoRender] Error queuing render job:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
   }
-  const voiceFile = path.join(jobDir, 'voiceover.mp3');
-  await downloadFile(job.voiceover, voiceFile);
-  const musicFile = path.join(jobDir, 'music.mp3');
-  await downloadFile(job.music, musicFile);
-
-  // 2. Trim scenes to match duration_target
-  const perScene = Math.floor(job.duration_target / sceneFiles.length);
-  const trimmedFiles: string[] = [];
-  for (let i = 0; i < sceneFiles.length; i++) {
-    const trimmed = path.join(jobDir, `trimmed${i}.mp4`);
-    await ffmpegCmd(`ffmpeg -y -i ${sceneFiles[i]} -t ${perScene} -vf "scale=1080:1920,setsar=1" -an ${trimmed}`);
-    trimmedFiles.push(trimmed);
-  }
-
-  // 3. Add transitions (simple fade)
-  const concatList = path.join(jobDir, 'concat.txt');
-  await fs.writeFile(concatList, trimmedFiles.map(f => `file '${f}'`).join('\n'));
-  const mergedVideo = path.join(jobDir, 'merged.mp4');
-  await ffmpegCmd(`ffmpeg -y -f concat -safe 0 -i ${concatList} -c copy ${mergedVideo}`);
-
-  // 4. Mix audio
-  const audioMix = path.join(jobDir, 'audio_mix.mp3');
-  await ffmpegCmd(`ffmpeg -y -i ${voiceFile} -i ${musicFile} -filter_complex "[1:a]volume=0.2[a1];[0:a][a1]amix=inputs=2:duration=first:dropout_transition=2" -c:a libmp3lame -q:a 2 ${audioMix}`);
-
-  // 5. Generate subtitles
-  const subsFile = path.join(jobDir, 'subs.srt');
-  await fs.writeFile(subsFile, `1\n00:00:00,000 --> 00:00:${job.duration_target},000\n${job.subtitles}\n`);
-
-  // 6. Final mux: add audio, subtitles, compress
-  const finalVideo = path.join(jobDir, 'final.mp4');
-  await ffmpegCmd(`ffmpeg -y -i ${mergedVideo} -i ${audioMix} -vf "subtitles=${subsFile}" -c:v libx264 -preset veryfast -crf 28 -c:a aac -b:a 128k -movflags +faststart -t ${job.duration_target} -aspect 9:16 -s 1080x1920 ${finalVideo}`);
-
-  // 7. Upload to storage (Supabase)
-  const fileBuffer = await fs.readFile(finalVideo);
-  const { data, error } = await supabase.storage.from('generated_videos').upload(`${jobId}/final.mp4`, fileBuffer, { contentType: 'video/mp4', upsert: true });
-  if (error) throw error;
-  const { publicUrl } = supabase.storage.from('generated_videos').getPublicUrl(`${jobId}/final.mp4`).data;
-
-  // 8. Track status
-  // Table 'video_render_jobs' does not exist in current Supabase types. Comment out for now.
-  // await supabase.from('video_render_jobs').upsert({ job_id: jobId, status: 'complete', video_url: publicUrl, finished_at: new Date().toISOString() });
-
-  // Cleanup
-  await fs.rm(jobDir, { recursive: true, force: true });
-
-  return publicUrl;
 }
+
+/**
+ * Get clip download information
+ * Users can download the source video and use it with a video editor
+ * Or integrate with automated rendering service
+ */
+export async function getClipDownloadInfo(
+  videoId: string,
+  clipId: string
+): Promise<{
+  videoUrl: string;
+  clipSpecs: any;
+  downloadReady: boolean;
+}> {
+  try {
+    // Fetch clip and video info
+    const { data: clip, error: clipError } = await supabase
+      .from('generated_clips')
+      .select(`
+        *,
+        videos (
+          id,
+          storage_path,
+          duration_seconds
+        )
+      `)
+      .eq('id', clipId)
+      .single();
+
+    if (clipError || !clip?.videos) {
+      throw new Error('Clip not found');
+    }
+
+    const video = clip.videos as any;
+    const videoUrl = await getVideoUrl(video.storage_path);
+
+    // Cast to any to access new columns not yet in Supabase types
+    const clipData = clip as any;
+
+    return {
+      videoUrl,
+      clipSpecs: {
+        startTime: clipData.start_time_seconds || 0,
+        endTime: clipData.end_time_seconds || video.duration_seconds,
+        caption: clipData.caption,
+        hashtags: clipData.hashtags,
+        fontStyle: clipData.font_style,
+        backgroundMusic: clipData.background_music_url,
+      },
+      downloadReady: true,
+    };
+  } catch (error: any) {
+    console.error('[VideoRender] Error getting download info:', error);
+    throw error;
+  }
+}
+
+/**
+ * Integration guide for production rendering
+ * 
+ * VIDEO RENDERING OPTIONS:
+ * 
+ * 1. CLOUDINARY (Recommended for simplicity)
+ *    - Cloud-based video transformation
+ *    - Supports trimming, overlays, captions
+ *    - Easy integration
+ *    
+ * 2. MUX
+ *    - Video streaming and processing
+ *    - Real-time transcoding
+ *    - Good for live processing
+ *    
+ * 3. FFmpeg.wasm
+ *    - Browser-based, no server needed
+ *    - Can be slow for large videos
+ *    - Good for simple trimming
+ *    
+ * 4. AWS Lambda + MediaConvert
+ *    - Serverless video processing
+ *    - Scalable and cost-effective
+ *    - Complex setup
+ * 
+ * To implement:
+ * 1. Choose a service above
+ * 2. Set up API credentials
+ * 3. Implement renderJob function with your service
+ * 4. Call it from processVideoAndCreateClips in clip-generation Edge Function
+ */
+

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Plus, CheckCircle2, Loader2, Calendar, Clock } from 'lucide-react';
+import { ArrowLeft, Download, Plus, CheckCircle2, Loader2, Calendar, Clock, Video, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
@@ -8,6 +8,7 @@ import { ClipCard } from '@/components/ClipCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestVideo, useGeneratedClips, useScheduleToBuffer } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export default function Results() {
   const { toast } = useToast();
   
   const [videoId, setVideoId] = useState<string | null>(null);
+  const [sourceVideoUrl, setSourceVideoUrl] = useState<string | null>(null);
   const [selectedClips, setSelectedClips] = useState<string[]>([]);
   const [postingFrequency, setPostingFrequency] = useState<'once_week' | 'twice_week' | 'daily' | 'every_other_day' | 'custom'>('daily');
   const [customSchedule, setCustomSchedule] = useState<string[]>([]);
@@ -43,7 +45,7 @@ export default function Results() {
     }
   }, [user, authLoading, navigate]);
 
-  // Get video ID from session or latest video
+  // Get video ID and source video URL
   useEffect(() => {
     const sessionVideoId = sessionStorage.getItem('currentVideoId');
     if (sessionVideoId) {
@@ -52,6 +54,32 @@ export default function Results() {
       setVideoId(latestVideo.id);
     }
   }, [latestVideo]);
+
+  // Fetch source video URL
+  useEffect(() => {
+    if (!videoId) return;
+    
+    const fetchVideoUrl = async () => {
+      try {
+        const { data: video } = await supabase
+          .from('videos')
+          .select('storage_path')
+          .eq('id', videoId)
+          .single();
+        
+        if (video?.storage_path) {
+          const { data } = supabase.storage
+            .from('videos')
+            .getPublicUrl(video.storage_path);
+          setSourceVideoUrl(data.publicUrl);
+        }
+      } catch (error) {
+        console.error('[Results] Error fetching video URL:', error);
+      }
+    };
+    
+    fetchVideoUrl();
+  }, [videoId]);
 
   const isLoading = authLoading || videoLoading || clipsLoading;
 
@@ -81,6 +109,11 @@ export default function Results() {
       thumbnail: '/placeholder.svg',
       caption: clip.caption || '',
       hashtags: clip.hashtags || [],
+      // Add clip metadata
+      startTime: clip.start_time_seconds || 0,
+      endTime: clip.end_time_seconds || clip.duration_seconds,
+      fontStyle: clip.font_style,
+      backgroundMusic: clip.background_music_url,
     };
   }) || [];
 
@@ -155,57 +188,114 @@ export default function Results() {
               <h2 className="text-xl font-bold mb-1">Content Generated Successfully!</h2>
               <p className="text-muted-foreground">
                 We've created {mappedClips.length} optimized clips from your video. 
-                Edit captions and hashtags before downloading.
+                Download the source video and edit captions before publishing.
               </p>
             </div>
-            <Button variant="gradient" className="shrink-0 hidden md:flex">
+            <Button variant="gradient" className="shrink-0 hidden md:flex" onClick={() => sourceVideoUrl && window.open(sourceVideoUrl, '_blank')}>
               <Download size={18} />
-              Download All
+              Source Video
             </Button>
           </div>
 
+          {/* Source Video Card */}
+          {sourceVideoUrl && (
+            <div className="glass-card rounded-xl p-6 mb-8">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Video className="text-primary" size={28} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">Source Video Ready</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Download and edit your original video. Your clip specifications are below.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => window.open(sourceVideoUrl, '_blank')}>
+                        <LinkIcon size={16} className="mr-1" />
+                        Open Video
+                      </Button>
+                      <a href={sourceVideoUrl} download="source-video.mp4">
+                        <Button size="sm" variant="gradient">
+                          <Download size={16} className="mr-1" />
+                          Download Video
+                        </Button>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Your Generated Clips</h1>
+            <div>
+              <h1 className="text-2xl font-bold">Your Generated Clips</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {mappedClips.length} optimized clips ready for editing and publishing
+              </p>
+            </div>
             <span className="text-muted-foreground">
-              {mappedClips.length} clips ready
+              {mappedClips.length} clips
             </span>
           </div>
 
           {/* Clips Grid */}
           {mappedClips.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {mappedClips.map((clip, index) => {
-                const isSelected = selectedClips.includes(clip.id);
-                return (
-                  <div
-                    key={clip.id}
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                    className="relative"
-                  >
+            <>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                {mappedClips.map((clip, index) => {
+                  const isSelected = selectedClips.includes(clip.id);
+                  return (
                     <div
-                      className={`absolute top-2 right-2 z-10 ${
-                        isSelected ? 'bg-primary text-primary-foreground' : 'bg-background/80'
-                      } rounded-full p-2 cursor-pointer`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isSelected) {
-                          setSelectedClips((prev) => prev.filter((id) => id !== clip.id));
-                        } else {
-                          setSelectedClips((prev) => [...prev, clip.id]);
-                        }
-                      }}
+                      key={clip.id}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                      className="relative"
                     >
-                      {isSelected ? <CheckCircle2 size={20} /> : <Plus size={20} />}
+                      <div
+                        className={`absolute top-2 right-2 z-10 ${
+                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-background/80'
+                        } rounded-full p-2 cursor-pointer transition-colors hover:bg-primary hover:text-primary-foreground`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isSelected) {
+                            setSelectedClips((prev) => prev.filter((id) => id !== clip.id));
+                          } else {
+                            setSelectedClips((prev) => [...prev, clip.id]);
+                          }
+                        }}
+                      >
+                        {isSelected ? <CheckCircle2 size={20} /> : <Plus size={20} />}
+                      </div>
+                      <div className="bg-secondary/50 rounded-lg p-3 mb-3 text-xs text-muted-foreground space-y-2 border border-border/50">
+                        <div className="flex justify-between">
+                          <span>Start: {Math.floor(clip.startTime)}s</span>
+                          <span>End: {Math.floor(clip.endTime)}s</span>
+                        </div>
+                        {clip.fontStyle && (
+                          <div className="text-xs">
+                            Font: {clip.fontStyle.family || 'Arial'} ({clip.fontStyle.size || 24}px)
+                          </div>
+                        )}
+                      </div>
+                      <ClipCard clip={clip} />
                     </div>
-                    <ClipCard clip={clip} />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Clip Info Note */}
+              <div className="glass-card rounded-xl p-4 mb-6 border-primary/20">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">Clip Information:</span> Each clip includes timing data, suggested caption, hashtags, and font styling. Download the source video and use the clip specifications to edit and render your final clips with a video editor or rendering service.
+                </p>
+              </div>
+            </>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              No clips generated yet. Try uploading a video first.
+              <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No clips generated yet. Try uploading a video first.</p>
             </div>
           )}
 
