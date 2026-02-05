@@ -240,21 +240,54 @@ export function useSaveUserTrends() {
       // Fetch trend details from trends_v2
       const { data: trendsFromV2, error: fetchError } = await supabase
         .from('trends_v2')
-        .select('id, title, description, platform_id')
+        .select('id, title, description, platform')
         .in('id', trendIds);
 
       if (fetchError) throw fetchError;
 
       if (trendsFromV2 && trendsFromV2.length > 0) {
+        // Fetch platform IDs for the platforms used by these trends
+        const platformNames = [...new Set(trendsFromV2.map((t: any) => t.platform))];
+        const { data: platforms, error: platformError } = await supabase
+          .from('platforms')
+          .select('id, name')
+          .in('name', platformNames);
+
+        if (platformError) {
+          console.warn('[useSaveUserTrends] Warning fetching platforms:', platformError);
+        }
+
+        // Create a map of platform name to ID
+        const platformMap: Record<string, string> = {};
+        if (platforms) {
+          platforms.forEach((p: any) => {
+            platformMap[p.name.toLowerCase()] = p.id;
+          });
+        }
+
         // Ensure these trends exist in the 'trends' table for foreign key compatibility
         // This syncs trending data from trends_v2 to trends table
-        const trendInserts = trendsFromV2.map((trend: any) => ({
-          id: trend.id,
-          title: trend.title,
-          description: trend.description,
-          platform_id: trend.platform_id,
-          is_active: true,
-        }));
+        const trendInserts = trendsFromV2.map((trend: any) => {
+          // Map platform name from trends_v2 to platform_id in trends table
+          const platformName = trend.platform?.toLowerCase() || '';
+          const mappedPlatformName = 
+            platformName === 'tiktok' ? 'TikTok' :
+            platformName === 'instagram' ? 'Instagram Reels' :
+            platformName === 'youtube' ? 'YouTube Shorts' :
+            platformName === 'twitter' ? 'Twitter/X' :
+            platformName === 'facebook' ? 'Facebook' :
+            'TikTok'; // Default fallback
+
+          const platform_id = platformMap[mappedPlatformName.toLowerCase()];
+          
+          return {
+            id: trend.id,
+            title: trend.title,
+            description: trend.description,
+            platform_id: platform_id || null,
+            is_active: true,
+          };
+        });
 
         // Upsert into trends table to ensure foreign key reference exists
         const { error: upsertError } = await supabase
