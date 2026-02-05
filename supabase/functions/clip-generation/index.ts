@@ -1,10 +1,10 @@
 // Supabase Edge Function: clip-generation
 // Processes long-form video into short clips based on selected trends
-// Analyzes trend examples and extracts pacing, timing, and style
+// Integrates AI services (OpenAI, Pexels, ElevenLabs, Jamendo)
+// Prepares clips for FFmpeg.wasm rendering
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const YOUTUBE_API_KEY = Deno.env.get('YOUTUBE_API_KEY') || '';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -48,6 +48,7 @@ interface ClipSpec {
     color: string;
   };
   background_music_url?: string | null;
+  voiceover_url?: string | null;
   additional_media_urls?: string[];
 }
 
@@ -137,17 +138,19 @@ Deno.serve(async (req) => {
 
     console.log('[ClipGen] Generating clip specs for', selectedPlatforms.length, 'platforms');
 
-    // Generate clip specifications
-    const clipSpecs = await generateEnhancedClipSpecs(
+    // Generate AI-enhanced clip specifications with scripts and assets
+    const clipSpecs = await generateAIEnhancedClipSpecs(
       trendAnalysis,
       selectedPlatforms,
       video,
-      trends || []
+      trends || [],
+      user_id,
+      supabase
     );
 
-    console.log(`[ClipGen] Generated ${clipSpecs.length} clip specs`);
+    console.log(`[ClipGen] Generated ${clipSpecs.length} clip specs with AI content`);
 
-    // Create clips in database
+    // Create clips in database with AI-generated content
     const createdClips = await processVideoAndCreateClips(
       video.id,
       clipSpecs,
@@ -339,111 +342,132 @@ function getMostCommonFont(fontStyles: any[]): any {
   };
 }
 
-async function generateEnhancedClipSpecs(
+async function generateAIEnhancedClipSpecs(
   analysis: TrendAnalysis,
   userPlatforms: any[],
   video: any,
-  trends: any[]
+  trends: any[],
+  userId: string,
+  supabase: any
 ): Promise<ClipSpec[]> {
   const specs: ClipSpec[] = [];
   const videoDuration = video.duration_seconds || 300;
 
-  // Search for matching additional media if needed
-  const matchingMediaUrls: string[] = [];
-  if (analysis.additional_media && analysis.additional_media.length > 0) {
-    for (const media of analysis.additional_media) {
-      const mediaUrl = await searchMatchingMedia(media.search_query, media.type);
-      if (mediaUrl) {
-        matchingMediaUrls.push(mediaUrl);
-      }
-    }
-  }
+  console.log('[ClipGen] Generating AI-enhanced clips for', userPlatforms.length, 'platforms');
 
-  // Get background music URL
-  const backgroundMusicUrl = await getBackgroundMusic(analysis.background_music_style || 'energetic');
-
-  // Generate 2-5 clips per platform
+  // Generate 2-3 clips per platform
   for (const up of userPlatforms) {
     const platform = (up.platforms as any);
     if (!platform) continue;
 
     const clipsPerPlatform = Math.min(3, Math.floor(videoDuration / (analysis.avg_duration * 2)));
 
-    // Extract captions from reference trends
-    const referenceCaptions = extractCaptionsFromTrends(trends, platform.name);
-
     for (let i = 0; i < clipsPerPlatform; i++) {
       const startTime = (i * (videoDuration / clipsPerPlatform)) + (analysis.hook_timing * i);
       const duration = analysis.avg_duration + (Math.random() * 10 - 5);
       const endTime = Math.min(startTime + duration, videoDuration);
 
-      // Use reference caption if available, otherwise generate
-      const caption = referenceCaptions[i] || generateCaption(platform.name, i);
+      // Select trend for this clip
+      const trend = trends[i % trends.length];
+      
+      try {
+        // Generate script using OpenAI via Edge Function
+        console.log('[ClipGen] Calling script-generation for trend:', trend?.title);
+        const scriptResult = await supabase.functions.invoke('script-generation', {
+          body: {
+            trend_title: trend?.title || 'Trending Content',
+            trend_description: trend?.description,
+            trend_hashtags: (trend?.hashtags || []).slice(0, 5),
+            platform: platform.name,
+            business_name: 'Your Business', // Could fetch from user profile
+            niche: 'general',
+            format_type: trend?.format_type,
+            hook_style: trend?.hook_style,
+          },
+        });
 
-      specs.push({
-        start_time: Math.round(startTime),
-        end_time: Math.round(endTime),
-        duration: Math.round(duration),
-        caption: caption,
-        hashtags: generateHashtags(platform.name),
-        platform_id: platform.id,
-        font_style: {
-          family: analysis.font_family || 'Arial',
-          size: analysis.font_size || 24,
-          weight: analysis.font_weight || 'bold',
-          color: analysis.font_color || '#FFFFFF',
-        },
-        background_music_url: backgroundMusicUrl,
-        additional_media_urls: matchingMediaUrls.length > 0 ? matchingMediaUrls : undefined,
-      });
+        if (scriptResult.error) {
+          console.error('[ClipGen] Script generation error:', scriptResult.error);
+          throw scriptResult.error;
+        }
+
+        const script = scriptResult.data;
+        console.log('[ClipGen] Script generated:', script.caption);
+
+        // Generate voiceover using ElevenLabs
+        console.log('[ClipGen] Calling elevenlabs-tts');
+        const voiceoverResult = await supabase.functions.invoke('elevenlabs-tts', {
+          body: {
+            text: script.fullScript || script.caption,
+            voice_id: 'EXAVITQu4vr4xnSDxMaL', // Friendly voice
+          },
+        });
+
+        const voiceoverUrl = voiceoverResult.data?.audio_url || null;
+        if (voiceoverUrl) {
+          console.log('[ClipGen] Voiceover generated');
+        }
+
+        // Fetch background music using Jamendo
+        console.log('[ClipGen] Calling background-music');
+        const musicResult = await supabase.functions.invoke('background-music', {
+          body: {
+            mood: analysis.background_music_style || 'upbeat',
+            duration: Math.round(duration),
+          },
+        });
+
+        const backgroundMusicUrl = musicResult.data?.track?.url || null;
+        if (backgroundMusicUrl) {
+          console.log('[ClipGen] Background music fetched');
+        }
+
+        // Create clip spec with AI-generated content
+        specs.push({
+          start_time: Math.round(startTime),
+          end_time: Math.round(endTime),
+          duration: Math.round(duration),
+          caption: script.caption || script.hook,
+          hashtags: script.hashtags || [],
+          platform_id: platform.id,
+          font_style: {
+            family: analysis.font_family || 'Arial',
+            size: analysis.font_size || 24,
+            weight: analysis.font_weight || 'bold',
+            color: analysis.font_color || '#FFFFFF',
+          },
+          background_music_url: backgroundMusicUrl,
+          voiceover_url: voiceoverUrl,
+          additional_media_urls: [],
+        });
+
+        console.log(`[ClipGen] Clip ${i + 1} spec created with AI content`);
+
+      } catch (error) {
+        console.error('[ClipGen] Error generating AI content for clip:', error);
+        
+        // Create fallback clip without AI content
+        specs.push({
+          start_time: Math.round(startTime),
+          end_time: Math.round(endTime),
+          duration: Math.round(duration),
+          caption: trend?.title || 'Check this out! 🔥',
+          hashtags: generateHashtags(platform.name),
+          platform_id: platform.id,
+          font_style: {
+            family: analysis.font_family || 'Arial',
+            size: analysis.font_size || 24,
+            weight: analysis.font_weight || 'bold',
+            color: analysis.font_color || '#FFFFFF',
+          },
+          background_music_url: null,
+          additional_media_urls: [],
+        });
+      }
     }
   }
 
   return specs;
-}
-
-async function searchMatchingMedia(query: string, mediaType: string): Promise<string | null> {
-  // Search YouTube for matching media content
-  if (!YOUTUBE_API_KEY) return null;
-
-  try {
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&maxResults=1&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
-    
-    const response = await fetch(searchUrl);
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (data.items && data.items.length > 0) {
-      const videoId = data.items[0].id.videoId;
-      // Return embed URL for video content
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-  } catch (error) {
-    console.error('[ClipGen] Failed to search matching media:', error);
-  }
-
-  return null;
-}
-
-async function getBackgroundMusic(style: string): Promise<string | null> {
-  // In production, this would fetch royalty-free music from a service
-  // For MVP, return a placeholder or use a royalty-free music API
-  // Examples: Freesound, YouTube Audio Library, etc.
-  
-  const musicMap: Record<string, string> = {
-    'upbeat': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', // Placeholder
-    'energetic': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    'calm': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  };
-
-  // Return null for MVP - actual music URLs would come from a music service
-  // This would be integrated with a service like:
-  // - Freesound API
-  // - YouTube Audio Library
-  // - Epidemic Sound API
-  // - Custom music library
-  
-  return null; // Will be set in production
 }
 
 function extractCaptionsFromTrends(trends: any[], platformName: string): string[] {
@@ -521,8 +545,9 @@ async function processVideoAndCreateClips(
           color: '#FFFFFF',
         },
         background_music_url: spec.background_music_url || null,
+        voiceover_url: spec.voiceover_url || null,
         additional_media_urls: spec.additional_media_urls || null,
-        // Note: thumbnail_url and storage_path will be set when video is actually processed
+        // Note: thumbnail_url and storage_path will be set when video is rendered by FFmpeg.wasm
       };
 
       console.log(`[ClipGen] Creating clip for platform ${spec.platform_id}:`, {
