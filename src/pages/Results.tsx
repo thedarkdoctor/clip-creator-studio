@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Plus, CheckCircle2, Loader2, Calendar, Clock, Video, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Download, Plus, CheckCircle2, Loader2, Calendar, Clock, Video, Link as LinkIcon, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
@@ -10,6 +10,8 @@ import { useLatestVideo, useGeneratedClips, useScheduleToBuffer } from '@/hooks/
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ContentGenerationButton } from '@/components/ContentGenerationButton';
+import { renderMultipleClips, type RenderProgress } from '@/services/contentRenderingService';
+import { isFFmpegSupported } from '@/services/contentRenderingService';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
@@ -34,10 +38,19 @@ export default function Results() {
   const [postingFrequency, setPostingFrequency] = useState<'once_week' | 'twice_week' | 'daily' | 'every_other_day' | 'custom'>('daily');
   const [customSchedule, setCustomSchedule] = useState<string[]>([]);
   const [isSchedulingOpen, setIsSchedulingOpen] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState<Record<string, RenderProgress>>({});
+  const [hasRendered, setHasRendered] = useState(false);
+  const [ffmpegSupported, setFfmpegSupported] = useState(true);
   
   const { data: latestVideo, isLoading: videoLoading } = useLatestVideo();
-  const { data: clips, isLoading: clipsLoading } = useGeneratedClips(videoId || undefined);
+  const { data: clips, isLoading: clipsLoading, refetch: refetchClips } = useGeneratedClips(videoId || undefined);
   const scheduleToBuffer = useScheduleToBuffer();
+
+  // Check FFmpeg support
+  useEffect(() => {
+    setFfmpegSupported(isFFmpegSupported());
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -81,6 +94,73 @@ export default function Results() {
     
     fetchVideoUrl();
   }, [videoId]);
+
+  // Auto-render clips when they're ready
+  useEffect(() => {
+    if (!clips || clips.length === 0 || hasRendered || isRendering) return;
+    
+    // Check if clips need rendering (no storage_path means not rendered yet)
+    const needsRendering = clips.some(clip => !clip.storage_path);
+    
+    if (needsRendering && videoId && latestVideo?.storage_path) {
+      handleRenderClips();
+    }
+  }, [clips, videoId, latestVideo, hasRendered, isRendering]);
+
+  const handleRenderClips = async () => {
+    if (!videoId || !latestVideo?.storage_path || !user) return;
+
+    setIsRendering(true);
+    setRenderProgress({});
+
+    try {
+      console.log('[Results] Starting clip rendering');
+
+      const results = await renderMultipleClips(
+        videoId,
+        latestVideo.storage_path,
+        user.id,
+        (clipId, progress) => {
+          setRenderProgress(prev => ({
+            ...prev,
+            [clipId]: progress,
+          }));
+        }
+      );
+
+      console.log('[Results] Rendering complete:', results);
+
+      // Refresh clips to show rendered videos
+      await refetchClips();
+      
+      setHasRendered(true);
+      setIsRendering(false);
+
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+
+      if (successCount > 0) {
+        toast({
+          title: 'Videos rendered successfully!',
+          description: `${successCount} clip${successCount > 1 ? 's' : ''} ready to download${failCount > 0 ? ` (${failCount} failed)` : ''}`,
+        });
+      } else {
+        toast({
+          title: 'Rendering failed',
+          description: 'Failed to render video clips. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('[Results] Rendering error:', error);
+      setIsRendering(false);
+      toast({
+        title: 'Rendering error',
+        description: error.message || 'Failed to render clips',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const isLoading = authLoading || videoLoading || clipsLoading;
 
