@@ -243,60 +243,58 @@ export function useSaveUserTrends() {
         .select('id, title, description, platform')
         .in('id', trendIds);
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error('[useSaveUserTrends] Error fetching trends_v2:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('[useSaveUserTrends] Fetched trends from v2:', trendsFromV2);
 
       if (trendsFromV2 && trendsFromV2.length > 0) {
-        // Fetch platform IDs for the platforms used by these trends
-        const platformNames = [...new Set(trendsFromV2.map((t: any) => t.platform))];
-        const { data: platforms, error: platformError } = await supabase
-          .from('platforms')
-          .select('id, name')
-          .in('name', platformNames);
+        try {
+          // Get any available platform to use as default
+          const { data: platforms, error: platformError } = await supabase
+            .from('platforms')
+            .select('id')
+            .limit(1);
 
-        if (platformError) {
-          console.warn('[useSaveUserTrends] Warning fetching platforms:', platformError);
-        }
+          if (platformError) {
+            console.error('[useSaveUserTrends] Error fetching platforms:', platformError);
+            throw platformError;
+          }
 
-        // Create a map of platform name to ID
-        const platformMap: Record<string, string> = {};
-        if (platforms) {
-          platforms.forEach((p: any) => {
-            platformMap[p.name.toLowerCase()] = p.id;
-          });
-        }
+          if (!platforms || platforms.length === 0) {
+            throw new Error('No platforms found in database');
+          }
 
-        // Ensure these trends exist in the 'trends' table for foreign key compatibility
-        // This syncs trending data from trends_v2 to trends table
-        const trendInserts = trendsFromV2.map((trend: any) => {
-          // Map platform name from trends_v2 to platform_id in trends table
-          const platformName = trend.platform?.toLowerCase() || '';
-          const mappedPlatformName = 
-            platformName === 'tiktok' ? 'TikTok' :
-            platformName === 'instagram' ? 'Instagram Reels' :
-            platformName === 'youtube' ? 'YouTube Shorts' :
-            platformName === 'twitter' ? 'Twitter/X' :
-            platformName === 'facebook' ? 'Facebook' :
-            'TikTok'; // Default fallback
+          const defaultPlatformId = platforms[0].id;
+          console.log('[useSaveUserTrends] Using default platform_id:', defaultPlatformId);
 
-          const platform_id = platformMap[mappedPlatformName.toLowerCase()];
-          
-          return {
+          // Prepare trend records for the trends table with a valid platform_id
+          const trendInserts = trendsFromV2.map((trend: any) => ({
             id: trend.id,
+            platform_id: defaultPlatformId, // Use default platform_id to satisfy FK constraint
             title: trend.title,
             description: trend.description,
-            platform_id: platform_id || null,
             is_active: true,
-          };
-        });
+          }));
 
-        // Upsert into trends table to ensure foreign key reference exists
-        const { error: upsertError } = await supabase
-          .from('trends')
-          .upsert(trendInserts, { onConflict: 'id' });
+          console.log('[useSaveUserTrends] Upserting', trendInserts.length, 'trends');
 
-        if (upsertError) {
-          console.warn('[useSaveUserTrends] Warning syncing to trends table:', upsertError);
-          // Don't fail completely - trends_v2 is the source of truth
+          // Upsert into trends table to satisfy foreign key constraint
+          const { error: upsertError } = await supabase
+            .from('trends')
+            .upsert(trendInserts, { onConflict: 'id' });
+
+          if (upsertError) {
+            console.error('[useSaveUserTrends] Error upserting trends:', upsertError);
+            throw upsertError;
+          }
+
+          console.log('[useSaveUserTrends] Successfully upserted trends');
+        } catch (syncError) {
+          console.error('[useSaveUserTrends] Error during trend sync:', syncError);
+          throw syncError;
         }
       }
       
