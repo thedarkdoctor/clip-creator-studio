@@ -228,6 +228,45 @@ export function useSaveUserTrends() {
     mutationFn: async (trendIds: string[]) => {
       if (!user) throw new Error('Not authenticated');
       
+      if (trendIds.length === 0) {
+        // Just delete existing selections if no new trends
+        await supabase
+          .from('user_trends')
+          .delete()
+          .eq('user_id', user.id);
+        return;
+      }
+
+      // Fetch trend details from trends_v2
+      const { data: trendsFromV2, error: fetchError } = await supabase
+        .from('trends_v2')
+        .select('id, title, description, platform_id')
+        .in('id', trendIds);
+
+      if (fetchError) throw fetchError;
+
+      if (trendsFromV2 && trendsFromV2.length > 0) {
+        // Ensure these trends exist in the 'trends' table for foreign key compatibility
+        // This syncs trending data from trends_v2 to trends table
+        const trendInserts = trendsFromV2.map((trend: any) => ({
+          id: trend.id,
+          title: trend.title,
+          description: trend.description,
+          platform_id: trend.platform_id,
+          is_active: true,
+        }));
+
+        // Upsert into trends table to ensure foreign key reference exists
+        const { error: upsertError } = await supabase
+          .from('trends')
+          .upsert(trendInserts, { onConflict: 'id' });
+
+        if (upsertError) {
+          console.warn('[useSaveUserTrends] Warning syncing to trends table:', upsertError);
+          // Don't fail completely - trends_v2 is the source of truth
+        }
+      }
+      
       // Delete existing trend selections
       await supabase
         .from('user_trends')
@@ -235,25 +274,22 @@ export function useSaveUserTrends() {
         .eq('user_id', user.id);
       
       // Insert new selections
-      if (trendIds.length > 0) {
-        const { error } = await supabase
-          .from('user_trends')
-          .insert(
-            trendIds.map((trendId) => ({
-              user_id: user.id,
-              trend_id: trendId,
-            }))
-          );
-        
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('user_trends')
+        .insert(
+          trendIds.map((trendId) => ({
+            user_id: user.id,
+            trend_id: trendId,
+          }))
+        );
+      
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-trends'] });
     },
   });
 }
-
 // Fetch user's selected trends
 export function useUserTrends() {
   const { user } = useAuth();
