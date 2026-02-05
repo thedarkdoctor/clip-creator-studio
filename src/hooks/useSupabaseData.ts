@@ -240,7 +240,7 @@ export function useSaveUserTrends() {
       // Fetch trend details from trends_v2
       const { data: trendsFromV2, error: fetchError } = await supabase
         .from('trends_v2')
-        .select('id, title, description, platform')
+        .select('id, title, description')
         .in('id', trendIds);
 
       if (fetchError) {
@@ -258,43 +258,42 @@ export function useSaveUserTrends() {
             .select('id')
             .limit(1);
 
-          if (platformError) {
-            console.error('[useSaveUserTrends] Error fetching platforms:', platformError);
-            throw platformError;
+          if (platformError || !platforms || platforms.length === 0) {
+            console.error('[useSaveUserTrends] No platforms available');
+            // Continue anyway - just try to save to user_trends
+          } else {
+            const defaultPlatformId = platforms[0].id;
+            console.log('[useSaveUserTrends] Using default platform_id:', defaultPlatformId);
+
+            // Prepare trend records
+            const trendInserts = trendsFromV2.map((trend: any) => ({
+              id: trend.id,
+              platform_id: defaultPlatformId,
+              title: trend.title || 'Trend',
+              description: trend.description,
+              is_active: true,
+            }));
+
+            console.log('[useSaveUserTrends] Preparing to insert', trendInserts.length, 'trends');
+
+            // Try to insert - ignore if already exists
+            for (const trendRecord of trendInserts) {
+              const { error: insertError } = await supabase
+                .from('trends')
+                .insert([trendRecord])
+                .select();
+
+              // Ignore "duplicate key value violates unique constraint" errors
+              if (insertError && !insertError.message?.includes('duplicate')) {
+                console.warn('[useSaveUserTrends] Warning inserting trend', trendRecord.id, ':', insertError);
+              }
+            }
+
+            console.log('[useSaveUserTrends] Attempted to insert trends');
           }
-
-          if (!platforms || platforms.length === 0) {
-            throw new Error('No platforms found in database');
-          }
-
-          const defaultPlatformId = platforms[0].id;
-          console.log('[useSaveUserTrends] Using default platform_id:', defaultPlatformId);
-
-          // Prepare trend records for the trends table with a valid platform_id
-          const trendInserts = trendsFromV2.map((trend: any) => ({
-            id: trend.id,
-            platform_id: defaultPlatformId, // Use default platform_id to satisfy FK constraint
-            title: trend.title,
-            description: trend.description,
-            is_active: true,
-          }));
-
-          console.log('[useSaveUserTrends] Upserting', trendInserts.length, 'trends');
-
-          // Upsert into trends table to satisfy foreign key constraint
-          const { error: upsertError } = await supabase
-            .from('trends')
-            .upsert(trendInserts, { onConflict: 'id' });
-
-          if (upsertError) {
-            console.error('[useSaveUserTrends] Error upserting trends:', upsertError);
-            throw upsertError;
-          }
-
-          console.log('[useSaveUserTrends] Successfully upserted trends');
         } catch (syncError) {
           console.error('[useSaveUserTrends] Error during trend sync:', syncError);
-          throw syncError;
+          // Continue anyway - user_trends insert might still work
         }
       }
       
