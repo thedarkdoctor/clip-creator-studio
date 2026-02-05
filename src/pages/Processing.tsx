@@ -35,6 +35,25 @@ export default function Processing() {
       navigate('/upload');
       return;
     }
+
+    // Check if we have actual data (not just empty arrays)
+    const platforms = userPlatforms
+      .map((up) => (up.platforms as any)?.name)
+      .filter(Boolean);
+    
+    const selectedTrendIds = userTrends.map((ut) => ut.trend_id);
+
+    if (platforms.length === 0) {
+      console.error('[Processing] No platforms selected. Redirect to brand setup.');
+      navigate('/brand-setup');
+      return;
+    }
+
+    if (selectedTrendIds.length === 0) {
+      console.error('[Processing] No trends selected. Redirect to trends.');
+      navigate('/trends');
+      return;
+    }
     
     setHasStarted(true);
     
@@ -47,35 +66,26 @@ export default function Processing() {
           console.log('[Processing] Updating video status to processing');
           await updateVideoStatus.mutateAsync({ videoId, status: 'processing' });
           
-          // Get platforms and trends from user selections
-          const platforms = userPlatforms
-            .map((up) => (up.platforms as any)?.name)
-            .filter(Boolean);
+          console.log('[Processing] Generating clips via Edge Function', {
+            platformCount: platforms.length,
+            trendCount: selectedTrendIds.length,
+          });
           
-          const selectedTrendIds = userTrends.map((ut) => ut.trend_id);
+          // Call clip-generation Edge Function
+          const { data, error } = await supabase.functions.invoke('clip-generation', {
+            body: {
+              video_id: videoId,
+              user_id: user.id,
+              selected_trend_ids: selectedTrendIds,
+              platforms,
+            },
+          });
 
-          if (platforms.length > 0 && selectedTrendIds.length > 0) {
-            console.log('[Processing] Generating clips via Edge Function', {
-              platformCount: platforms.length,
-              trendCount: selectedTrendIds.length,
-            });
-            
-            // Call clip-generation Edge Function
-            const { data, error } = await supabase.functions.invoke('clip-generation', {
-              body: {
-                video_id: videoId,
-                user_id: user.id,
-                selected_trend_ids: selectedTrendIds,
-                platforms,
-              },
-            });
-
-            if (error) {
-              throw new Error(`Clip generation failed: ${error.message}`);
-            }
-
-            console.log('[Processing] Clips generated successfully', { count: data?.count });
+          if (error) {
+            throw new Error(`Clip generation failed: ${error.message}`);
           }
+
+          console.log('[Processing] Clips generated successfully', { count: data?.count });
           
           console.log('[Processing] Updating video status to complete');
           await updateVideoStatus.mutateAsync({ videoId, status: 'complete' });
