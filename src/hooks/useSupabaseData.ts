@@ -287,6 +287,12 @@ export function useCreateVideo() {
     }) => {
       if (!user) throw new Error('Not authenticated');
       
+      console.log('[useCreateVideo] Creating video record', { 
+        fileName: data.fileName, 
+        storagePath: data.storagePath
+      });
+      
+      // Create minimal video record with only required fields
       const { data: video, error } = await supabase
         .from('videos')
         .insert({
@@ -294,12 +300,16 @@ export function useCreateVideo() {
           file_name: data.fileName,
           storage_path: data.storagePath,
           status: 'uploaded',
-          duration_seconds: data.durationSeconds || 300, // Default to 5 minutes if not provided
         })
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('[useCreateVideo] Error creating video:', error);
+        throw error;
+      }
+      
+      console.log('[useCreateVideo] Video created successfully:', video.id);
       return video as Video;
     },
     onSuccess: () => {
