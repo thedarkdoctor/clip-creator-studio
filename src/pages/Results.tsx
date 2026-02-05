@@ -8,6 +8,7 @@ import { ClipCard } from '@/components/ClipCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestVideo, useGeneratedClips, useScheduleToBuffer } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
+import { ContentGenerationButton } from '@/components/ContentGenerationButton';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +24,7 @@ const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function Results() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, lynkscopeUser, businessName, niche } = useAuth();
   const { toast } = useToast();
   
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -38,10 +39,10 @@ export default function Results() {
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !lynkscopeUser) {
       navigate('/auth');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, lynkscopeUser, authLoading, navigate]);
 
   // Get video ID from session or latest video
   useEffect(() => {
@@ -328,21 +329,24 @@ export default function Results() {
             </div>
           )}
 
-          {/* Actions Footer */}
           <div className="glass-card rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="font-semibold mb-1">Want more content?</h3>
               <p className="text-muted-foreground text-sm">
-                Upload another video or try different trending formats.
+                Generate more AI-powered content or upload another video.
               </p>
             </div>
             <div className="flex gap-3">
+              {businessName && niche && (
+                <ContentGenerationButton
+                  maxTrends={3}
+                  variant="outline"
+                  size="default"
+                  showProgress={false}
+                />
+              )}
               <Button variant="outline" onClick={() => navigate('/trends')}>
                 Change Trends
-              </Button>
-              <Button variant="gradient" onClick={() => navigate('/upload')}>
-                <Plus size={18} />
-                New Video
               </Button>
             </div>
           </div>
