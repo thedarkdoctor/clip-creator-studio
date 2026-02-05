@@ -3,15 +3,17 @@
  * Production interface for trend analysis (NOT video player)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, Loader2, TrendingUp } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Loader2, TrendingUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { ProgressSteps } from '@/components/ProgressSteps';
 import { TrendIntelligenceCard } from '@/components/TrendIntelligenceCard';
 import { TrendFiltersBar } from '@/components/TrendFiltersBar';
 import { ScraperStatusWidget } from '@/components/ScraperStatusWidget';
+import { ContentGenerationButton } from '@/components/ContentGenerationButton';
+import { AutoModeToggle } from '@/components/AutoModeToggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrends, type TrendFilters } from '@/hooks/useTrendIntelligence';
 import { useSaveUserTrends } from '@/hooks/useSupabaseData';
@@ -22,21 +24,28 @@ const steps = ['Brand', 'Trends', 'Upload', 'Results'];
 
 export default function TrendSelectionV2() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, userId, businessName, niche, isLynkscopeSession, lynkscopeUser } = useAuth();
   const { toast } = useToast();
   const saveUserTrends = useSaveUserTrends();
   
   const [filters, setFilters] = useState<TrendFilters>({});
   const [selectedTrends, setSelectedTrends] = useState<Set<string>>(new Set());
+  const [showAutoMode, setShowAutoMode] = useState(false);
   
-  const { data: trends, isLoading: trendsLoading, error } = useTrends(filters);
+  // Use user's niche for strategy-aware trend scoring
+  const effectiveNiche = niche || lynkscopeUser?.niche;
+  const { data: trends, isLoading: trendsLoading, error } = useTrends(filters, effectiveNiche);
+  
+  // Check if user profile is complete for content generation
+  const isProfileComplete = useMemo(() => {
+    return !!(userId && businessName && effectiveNiche);
+  }, [userId, businessName, effectiveNiche]);
 
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !lynkscopeUser) {
       navigate('/auth');
     }
-  }, [user, authLoading, navigate]);
+  }, [user, lynkscopeUser, authLoading, navigate]);
 
   const toggleTrend = (trend: EnhancedTrend) => {
     setSelectedTrends((prev) => {
@@ -120,7 +129,44 @@ export default function TrendSelectionV2() {
                 )}
               </p>
             </div>
+            
+            {/* Content Generation Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {isProfileComplete && (
+                <div className="w-full sm:w-auto">
+                  <ContentGenerationButton
+                    maxTrends={5}
+                    variant="default"
+                    size="default"
+                    showProgress={false}
+                  />
+                </div>
+              )}
+            </div>
           </div>
+
+          {!isProfileComplete && (isLynkscopeSession || user) && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-destructive">Complete Your Profile</p>
+                  <p className="text-sm text-muted-foreground">
+                    Set your business name and niche in Lynkscope to enable AI-powered content generation.
+                    {!businessName && ' Missing: Business Name.'}
+                    {!effectiveNiche && ' Missing: Niche.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto Mode Toggle */}
+          {isProfileComplete && (
+            <div className="mb-6">
+              <AutoModeToggle onToggle={setShowAutoMode} />
+            </div>
+          )}
 
           {/* Scraper Status */}
           <div className="mb-6">

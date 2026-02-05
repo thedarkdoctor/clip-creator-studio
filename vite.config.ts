@@ -10,14 +10,8 @@ export default defineConfig(({ mode }) => ({
   },
   
   server: {
-    host: true,
-    port: 8080,
-    strictPort: true,
-    cors: true,
-    hmr: {
-      clientPort: 443,
-      overlay: false,
-    },
+    port: 3000,
+    host: '0.0.0.0',
     allowedHosts: true
   },
 

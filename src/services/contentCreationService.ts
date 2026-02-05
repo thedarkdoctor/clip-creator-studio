@@ -2,6 +2,27 @@
 import { supabase } from '@/integrations/supabase/client';
 import { generateNicheKeywords } from '../lib/generateNicheKeywords';
 import { generateBrandAwareScript } from '../lib/generateBrandAwareScript';
+import { 
+  fetchMarketingIntelligence, 
+  generateContentStrategy,
+  shouldPrioritizePlatform,
+  type MarketingIntelligence 
+} from './marketingStrategyService';
+
+interface UserContext {
+  id: string;
+  business_name: string;
+  niche: string;
+}
+
+interface TrendContext {
+  id: string;
+  platform: string;
+  title: string;
+  format_type: string;
+  hook_style: string;
+  hashtags: string[];
+}
 
 // Helper: Fetch user and trend context
 async function loadContext(userId: string, trendId: string) {
@@ -9,12 +30,29 @@ async function loadContext(userId: string, trendId: string) {
   if (userError || !user) throw new Error('User not found');
   const { data: trend, error: trendError } = await (supabase as any).from('trends_v2').select('*').eq('id', trendId).single();
   if (trendError || !trend) throw new Error('Trend not found');
-  return { user: user as { id: string; business_name: string; niche: string }, trend };
+  return { 
+    user: user as UserContext, 
+    trend: trend as TrendContext 
+  };
 }
 
-// Helper: Brand-aware script generation
-async function generateScript(user: any, trend: any) {
-  return generateBrandAwareScript(user, trend);
+// Helper: Brand-aware, strategy-aware script generation
+async function generateScript(
+  user: UserContext, 
+  trend: TrendContext, 
+  intelligence: MarketingIntelligence | null
+) {
+  return generateBrandAwareScript(
+    { business_name: user.business_name, niche: user.niche },
+    { 
+      format_type: trend.format_type, 
+      hook_style: trend.hook_style, 
+      title: trend.title, 
+      hashtags: trend.hashtags || [],
+      platform: trend.platform,
+    },
+    { intelligence, platform: trend.platform }
+  );
 }
 
 // Helper: Voiceover (ElevenLabs)
@@ -82,21 +120,51 @@ async function assembleVideoJob({ scenes, voiceover, music, subtitles }: { scene
   return data.video_url;
 }
 
-// Main pipeline
+// Main pipeline - Now strategy-aware
 export async function createMarketingVideo(trendId: string, userId: string) {
+  console.log('[ContentCreation] Starting video creation for trend:', trendId);
+  
   // 1. Load context
   const { user, trend } = await loadContext(userId, trendId);
-  // 2. Script (brand-aware)
-  const script = await generateScript(user, trend);
-  // 3. Voiceover
+  
+  // 2. Fetch marketing intelligence for strategy-aware generation
+  const intelligence = await fetchMarketingIntelligence(userId);
+  console.log('[ContentCreation] Marketing intelligence loaded:', !!intelligence);
+  
+  // 3. Get content strategy based on platform performance
+  const strategy = generateContentStrategy(trend.platform, intelligence);
+  console.log('[ContentCreation] Content strategy:', {
+    hookStyle: strategy.hookStyle,
+    ctaFocus: strategy.ctaFocus,
+    volumeMultiplier: strategy.contentVolumeMultiplier,
+  });
+  
+  // 4. Check if this platform should be prioritized
+  const platformPriority = shouldPrioritizePlatform(trend.platform, intelligence);
+  console.log('[ContentCreation] Platform priority:', platformPriority);
+  
+  // 5. Script (brand-aware + strategy-aware)
+  const script = await generateScript(user, trend, intelligence);
+  console.log('[ContentCreation] Script generated with strategy:', script.strategyApplied);
+  
+  // 6. Voiceover
   const audio_url = await generateVoiceover(script.value_point, user.niche);
-  // 4. Visuals
+  
+  // 7. Visuals
   const scenes = await generateVisualSceneList(script, user.niche);
-  // 5. Music
+  
+  // 8. Music
   const music_url = await fetchMusic(user.niche);
-  // 6. Video assembly
-  const video_url = await assembleVideoJob({ scenes, voiceover: audio_url, music: music_url, subtitles: script.value_point });
-  // 7. Save result
+  
+  // 9. Video assembly
+  const video_url = await assembleVideoJob({ 
+    scenes, 
+    voiceover: audio_url, 
+    music: music_url, 
+    subtitles: script.value_point 
+  });
+  
+  // 10. Save result with strategy metadata
   // Table 'generated_videos' does not exist in current Supabase types. Use 'videos' as fallback or comment out.
   // await supabase.from('generated_videos').insert({
   //   user_id: userId,
@@ -106,6 +174,57 @@ export async function createMarketingVideo(trendId: string, userId: string) {
   //   hashtags: script.hashtags,
   //   created_at: new Date().toISOString(),
   //   status: 'complete',
+  //   strategy_applied: script.strategyApplied,
+  //   hook_style: script.hookStyle,
+  //   platform: trend.platform,
   // });
-  return video_url;
+  
+  return {
+    video_url,
+    script,
+    strategy,
+    platformPriority,
+  };
+}
+
+/**
+ * Generate content for multiple trends with strategy-aware platform prioritization
+ */
+export async function createBatchContent(
+  trendIds: string[], 
+  userId: string,
+  options?: { respectVolumeMultiplier?: boolean }
+) {
+  console.log('[ContentCreation] Starting batch content for', trendIds.length, 'trends');
+  
+  const intelligence = await fetchMarketingIntelligence(userId);
+  const results: any[] = [];
+  
+  for (const trendId of trendIds) {
+    try {
+      // Get trend details for strategy calculation
+      const { data: trend } = await (supabase as any)
+        .from('trends_v2')
+        .select('platform')
+        .eq('id', trendId)
+        .single();
+      
+      if (trend && intelligence && options?.respectVolumeMultiplier) {
+        const strategy = generateContentStrategy(trend.platform, intelligence);
+        
+        // If volume multiplier > 1, this platform needs more content
+        if (strategy.contentVolumeMultiplier > 1) {
+          console.log(`[ContentCreation] Platform ${trend.platform} needs ${strategy.contentVolumeMultiplier}x content`);
+        }
+      }
+      
+      const result = await createMarketingVideo(trendId, userId);
+      results.push({ trendId, success: true, result });
+    } catch (error) {
+      console.error('[ContentCreation] Failed for trend:', trendId, error);
+      results.push({ trendId, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  }
+  
+  return results;
 }
