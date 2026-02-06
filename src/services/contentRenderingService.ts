@@ -213,6 +213,11 @@ async function generateThumbnail(
     const thumbnailFileName = `${clipId}_thumb.jpg`;
     const thumbnailPath = `${userId}/thumbnails/${thumbnailFileName}`;
 
+    console.log('[ContentRender] Uploading thumbnail:', {
+      bucket: 'videos',
+      thumbnailPath
+    });
+
     const { error } = await supabase.storage
       .from('videos')
       .upload(thumbnailPath, thumbnailBlob, {
@@ -222,9 +227,15 @@ async function generateThumbnail(
       });
 
     if (error) {
-      console.error('[ContentRender] Thumbnail upload failed:', error);
+      console.error('[ContentRender] Thumbnail upload failed:', {
+        error,
+        message: error.message,
+        thumbnailPath
+      });
       return undefined;
     }
+
+    console.log('[ContentRender] Thumbnail uploaded successfully:', thumbnailPath);
 
     // Clean up
     URL.revokeObjectURL(video.src);
