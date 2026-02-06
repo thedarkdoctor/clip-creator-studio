@@ -52,11 +52,34 @@ export interface RenderResult {
  */
 async function fetchVideoFile(storagePath: string): Promise<File> {
   try {
+    console.log('[ContentRender] Fetching video file from storage', {
+      bucket: 'videos',
+      storagePath
+    });
+    
     const { data, error } = await supabase.storage
       .from('videos')
       .download(storagePath);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ContentRender] Storage download failed:', {
+        error,
+        message: error.message,
+        bucket: 'videos',
+        storagePath
+      });
+      
+      if (error.message.includes('Bucket not found') || error.message.includes('404')) {
+        throw new Error('STORAGE_BUCKET_NOT_FOUND: The videos storage bucket does not exist.');
+      }
+      
+      throw error;
+    }
+
+    console.log('[ContentRender] Video file downloaded successfully', {
+      size: data.size,
+      type: data.type
+    });
 
     const fileName = storagePath.split('/').pop() || 'video.mp4';
     return new File([data], fileName, { type: 'video/mp4' });
