@@ -1,5 +1,5 @@
 // Supabase Edge Function: script-generation
-// Generates video scripts using OpenAI GPT-4
+// Generates video scripts using OpenAI GPT-4 with intelligent fallback
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -19,6 +19,19 @@ interface ScriptRequest {
   niche?: string;
   format_type?: string;
   hook_style?: string;
+}
+
+interface ScriptResponse {
+  hook: string;
+  hookStyle: string;
+  valuePoint: string;
+  authorityLine: string;
+  cta: string;
+  caption: string;
+  hashtags: string[];
+  fullScript: string;
+  estimatedDuration: number;
+  _fallbackUsed?: boolean;
 }
 
 Deno.serve(async (req) => {
