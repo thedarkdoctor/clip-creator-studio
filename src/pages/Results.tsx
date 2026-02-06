@@ -95,72 +95,9 @@ export default function Results() {
     fetchVideoUrl();
   }, [videoId]);
 
-  // Auto-render clips when they're ready
-  useEffect(() => {
-    if (!clips || clips.length === 0 || hasRendered || isRendering) return;
-    
-    // Check if clips need rendering (no storage_path means not rendered yet)
-    const needsRendering = clips.some(clip => !clip.storage_path);
-    
-    if (needsRendering && videoId && latestVideo?.storage_path) {
-      handleRenderClips();
-    }
-  }, [clips, videoId, latestVideo, hasRendered, isRendering]);
+  // Note: Auto-render is disabled since the generated_clips table 
+  // doesn't have storage_path column. Clips are metadata-only for manual editing.
 
-  const handleRenderClips = async () => {
-    if (!videoId || !latestVideo?.storage_path || !user) return;
-
-    setIsRendering(true);
-    setRenderProgress({});
-
-    try {
-      console.log('[Results] Starting clip rendering');
-
-      const results = await renderMultipleClips(
-        videoId,
-        latestVideo.storage_path,
-        user.id,
-        (clipId, progress) => {
-          setRenderProgress(prev => ({
-            ...prev,
-            [clipId]: progress,
-          }));
-        }
-      );
-
-      console.log('[Results] Rendering complete:', results);
-
-      // Refresh clips to show rendered videos
-      await refetchClips();
-      
-      setHasRendered(true);
-      setIsRendering(false);
-
-      const successCount = results.filter(r => r.success).length;
-      const failCount = results.filter(r => !r.success).length;
-
-      if (successCount > 0) {
-        toast({
-          title: 'Videos rendered successfully!',
-          description: `${successCount} clip${successCount > 1 ? 's' : ''} ready to download${failCount > 0 ? ` (${failCount} failed)` : ''}`,
-        });
-      } else {
-        toast({
-          title: 'Rendering failed',
-          description: 'Failed to render video clips. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      console.error('[Results] Rendering error:', error);
-      setIsRendering(false);
-      toast({
-        title: 'Rendering error',
-        description: error.message || 'Failed to render clips',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const isLoading = authLoading || videoLoading || clipsLoading;
 
@@ -190,11 +127,11 @@ export default function Results() {
       thumbnail: '/placeholder.svg',
       caption: clip.caption || '',
       hashtags: clip.hashtags || [],
-      // Add clip metadata
-      startTime: clip.start_time_seconds || 0,
-      endTime: clip.end_time_seconds || clip.duration_seconds,
-      fontStyle: clip.font_style,
-      backgroundMusic: clip.background_music_url,
+      // Default values since these columns don't exist in DB yet
+      startTime: 0,
+      endTime: clip.duration_seconds,
+      fontStyle: { family: 'Arial', size: 24, weight: 'bold', color: '#FFFFFF' },
+      backgroundMusic: undefined,
     };
   }) || [];
 

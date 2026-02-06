@@ -24,34 +24,46 @@ Deno.serve(async (req) => {
     console.log('[BackgroundMusic] Fetching music:', mood);
 
     if (!JAMENDO_CLIENT_ID) {
-      throw new Error('Jamendo API key not configured');
+      console.warn('[BackgroundMusic] Jamendo API key not configured, returning null');
+      return new Response(
+        JSON.stringify({ track: null, message: 'Music service not configured' }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Map moods to Jamendo tags
     const moodTags: Record<string, string> = {
-      upbeat: 'upbeat,energetic',
-      energetic: 'energetic,motivational',
-      calm: 'calm,relaxed',
-      corporate: 'corporate,business',
-      motivational: 'motivational,inspiring',
+      upbeat: 'upbeat',
+      energetic: 'energetic',
+      calm: 'relaxing',
+      corporate: 'corporate',
+      motivational: 'motivational',
     };
 
     const tags = moodTags[mood] || 'upbeat';
 
-    // Call Jamendo API
+    // Call Jamendo API with fuzzytags for better results
     const response = await fetch(
-      `https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=1&tags=${tags},instrumental&audioformat=mp32`
+      `https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=5&fuzzytags=${tags}&audioformat=mp32&include=musicinfo`
     );
 
     if (!response.ok) {
       console.error('[BackgroundMusic] Jamendo API error:', response.statusText);
-      throw new Error('Jamendo API request failed');
+      // Return null instead of throwing - music is optional
+      return new Response(
+        JSON.stringify({ track: null, message: 'Music API unavailable' }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
     const data = await response.json();
     
     if (!data.results || data.results.length === 0) {
-      throw new Error('No music tracks found');
+      console.log('[BackgroundMusic] No tracks found, returning null');
+      return new Response(
+        JSON.stringify({ track: null, message: 'No tracks found' }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      );
     }
 
     const track = data.results[0];
