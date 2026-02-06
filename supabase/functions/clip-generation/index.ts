@@ -386,16 +386,38 @@ async function generateAIEnhancedClipSpecs(
           },
         });
 
+         // Check for errors but don't fail - script-generation has internal fallback
+        let script;
         if (scriptResult.error) {
-          console.error('[ClipGen] Script generation error:', scriptResult.error);
-          throw scriptResult.error;
+           console.warn('[ClipGen] Script generation returned error, using local fallback:', scriptResult.error);
+          // Create local fallback script
+          script = {
+            hook: trend?.title || 'Check this out! 🔥',
+            hookStyle: trend?.hook_style || 'trending',
+            valuePoint: trend?.description || 'Amazing content ahead.',
+            authorityLine: 'Follow for more great content!',
+            cta: 'Like and save for later!',
+            caption: trend?.title || 'New trending content',
+            hashtags: (trend?.hashtags || ['#trending', '#viral', '#fyp']).slice(0, 5),
+            fullScript: `${trend?.title || 'Check this out!'}
+
+${trend?.description || 'Amazing content ahead.'}
+
+Follow for more great content!
+
+Like and save for later!`,
+            estimatedDuration: 30,
+          };
+        } else {
+          script = scriptResult.data;
         }
 
-        const script = scriptResult.data;
-        console.log('[ClipGen] Script generated:', script.caption);
+        console.log('[ClipGen] Script ready:', script.caption);
 
-        // Generate voiceover using ElevenLabs
+        // Generate voiceover using ElevenLabs (with error handling)
         console.log('[ClipGen] Calling elevenlabs-tts');
+        let voiceoverUrl = null;
+        try {
         const voiceoverResult = await supabase.functions.invoke('elevenlabs-tts', {
           body: {
             text: script.fullScript || script.caption,
@@ -403,13 +425,20 @@ async function generateAIEnhancedClipSpecs(
           },
         });
 
-        const voiceoverUrl = voiceoverResult.data?.audio_url || null;
-        if (voiceoverUrl) {
+        if (!voiceoverResult.error && voiceoverResult.data?.audio_url) {
+            voiceoverUrl = voiceoverResult.data.audio_url;
           console.log('[ClipGen] Voiceover generated');
+           } else {
+            console.warn('[ClipGen] Voiceover generation failed, continuing without voiceover');
+          }
+        } catch (voError) {
+          console.warn('[ClipGen] Voiceover error, continuing without voiceover:', voError);
         }
 
-        // Fetch background music using Jamendo
+        // Fetch background music using Jamendo (with error handling)
         console.log('[ClipGen] Calling background-music');
+         let backgroundMusicUrl = null;
+        try {
         const musicResult = await supabase.functions.invoke('background-music', {
           body: {
             mood: analysis.background_music_style || 'upbeat',
@@ -417,12 +446,17 @@ async function generateAIEnhancedClipSpecs(
           },
         });
 
-        const backgroundMusicUrl = musicResult.data?.track?.url || null;
-        if (backgroundMusicUrl) {
+        if (!musicResult.error && musicResult.data?.track?.url) {
+            backgroundMusicUrl = musicResult.data.track.url;
           console.log('[ClipGen] Background music fetched');
+           } else {
+            console.warn('[ClipGen] Music fetch failed, continuing without music');
+          }
+        } catch (musicError) {
+          console.warn('[ClipGen] Music error, continuing without music:', musicError);
         }
 
-        // Create clip spec with AI-generated content
+        Create clip spec with available content (AI-generated or fallback)
         specs.push({
           start_time: Math.round(startTime),
           end_time: Math.round(endTime),
@@ -441,18 +475,18 @@ async function generateAIEnhancedClipSpecs(
           additional_media_urls: [],
         });
 
-        console.log(`[ClipGen] Clip ${i + 1} spec created with AI content`);
+        console.log(`[ClipGen] Clip ${i + 1} spec created successfully`);
 
       } catch (error) {
-        console.error('[ClipGen] Error generating AI content for clip:', error);
+       console.error('[ClipGen] Error generating content for clip, using minimal fallback:', error);
         
-        // Create fallback clip without AI content
+         // Create minimal fallback clip to keep pipeline alive
         specs.push({
           start_time: Math.round(startTime),
           end_time: Math.round(endTime),
           duration: Math.round(duration),
-          caption: trend?.title || 'Check this out! 🔥',
-          hashtags: generateHashtags(platform.name),
+          caption: trend?.title || 'Amazing content! 🎬',
+          hashtags: ['#trending', '#viral', '#fyp', ...(trend?.hashtags || [])].slice(0, 5),
           platform_id: platform.id,
           font_style: {
             family: analysis.font_family || 'Arial',
@@ -461,8 +495,11 @@ async function generateAIEnhancedClipSpecs(
             color: analysis.font_color || '#FFFFFF',
           },
           background_music_url: null,
+          voiceover_url: null,
           additional_media_urls: [],
         });
+
+        console.log(`[ClipGen] Clip ${i + 1} created with minimal fallback`);
       }
     }
   }
