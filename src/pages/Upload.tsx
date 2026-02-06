@@ -79,7 +79,13 @@ export default function Upload() {
       // Use user.id as the folder name to match RLS policy
       const filePath = `${user.id}/${fileName}`;
 
-      console.log('[Upload] Uploading video to storage', { fileName, size: file.size, userId: user.id });
+       console.log('[Upload] Uploading video to storage', { 
+        bucketName: 'videos',
+        fileName, 
+        filePath,
+        size: file.size, 
+        userId: user.id 
+      });
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('videos')
@@ -89,10 +95,26 @@ export default function Upload() {
         });
 
       if (uploadError) {
+        console.error('[Upload] Storage upload failed:', {
+          error: uploadError,
+          message: uploadError.message,
+          statusCode: uploadError.statusCode,
+          bucket: 'videos',
+          filePath
+        });
+        
+        if (uploadError.message.includes('Bucket not found') || uploadError.statusCode === '404') {
+          throw new Error('STORAGE_BUCKET_NOT_FOUND: The videos storage bucket does not exist. Please contact support.');
+        }
+        
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      console.log('[Upload] Video uploaded successfully', uploadData);
+      console.log('[Upload] Video uploaded successfully', { 
+        uploadData, 
+        filePath,
+        bucket: 'videos' 
+      });
 
       // Create video record in database with storage path
       const video = await createVideo.mutateAsync({
