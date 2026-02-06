@@ -101,7 +101,12 @@ async function uploadRenderedClip(
     const fileName = `${clipId}_${Date.now()}.mp4`;
     const filePath = `${userId}/clips/${fileName}`;
 
-    console.log('[ContentRender] Uploading rendered clip:', filePath);
+   console.log('[ContentRender] Uploading rendered clip:', {
+      bucket: 'videos',
+      filePath,
+      size: clipBlob.size,
+      userId
+    });
 
     const { data, error } = await supabase.storage
       .from('videos')
@@ -111,14 +116,31 @@ async function uploadRenderedClip(
         upsert: false,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ContentRender] Storage upload failed:', {
+        error,
+        message: error.message,
+        bucket: 'videos',
+        filePath
+      });
+      
+      if (error.message.includes('Bucket not found') || error.message.includes('404')) {
+        throw new Error('STORAGE_BUCKET_NOT_FOUND: The videos storage bucket does not exist.');
+      }
+      
+      throw error;
+    }
 
     // Get public URL
     const { data: urlData } = supabase.storage
       .from('videos')
       .getPublicUrl(filePath);
 
-    console.log('[ContentRender] Upload complete:', urlData.publicUrl);
+    console.log('[ContentRender] Upload complete:', {
+      publicUrl: urlData.publicUrl,
+      filePath
+    });
+    
     return filePath;
   } catch (error) {
     console.error('[ContentRender] Upload failed:', error);
