@@ -75,25 +75,50 @@ export default function Results() {
     
     const fetchVideoUrl = async () => {
       try {
-        const { data: video } = await supabase
+        console.log('[Results] Fetching video metadata', { videoId });
+        
+        const { data: video, error: videoError } = await supabase
           .from('videos')
           .select('storage_path')
           .eq('id', videoId)
           .single();
+
+        if (videoError) {
+          console.error('[Results] Failed to fetch video metadata:', videoError);
+          return;
+        }
         
         if (video?.storage_path) {
+          console.log('[Results] Generating public URL', {
+            bucket: 'videos',
+            storagePath: video.storage_path
+          });
+          
           const { data } = supabase.storage
             .from('videos')
             .getPublicUrl(video.storage_path);
+
+          console.log('[Results] Public URL generated:', {
+            publicUrl: data.publicUrl,
+            storagePath: video.storage_path
+          });
+
           setSourceVideoUrl(data.publicUrl);
+           } else {
+          console.warn('[Results] No storage_path found for video');
         }
       } catch (error) {
         console.error('[Results] Error fetching video URL:', error);
+        toast({
+          title: 'Storage Error',
+          description: 'Failed to load video. The storage bucket may not be configured.',
+          variant: 'destructive',
+        });
       }
     };
     
     fetchVideoUrl();
-  }, [videoId]);
+   }, [videoId, toast]);
 
   // Note: Auto-render is disabled since the generated_clips table 
   // doesn't have storage_path column. Clips are metadata-only for manual editing.
