@@ -38,9 +38,16 @@ interface RenderJobResult {
  * This allows downloading the source video for editing
  */
 export async function getVideoUrl(storagePath: string): Promise<string> {
+  console.log('[VideoRender] Getting public URL for video', {
+    bucket: 'videos',
+    storagePath
+  });
+  
   const { data } = supabase.storage
     .from('videos')
     .getPublicUrl(storagePath);
+
+  console.log('[VideoRender] Public URL generated:', data.publicUrl);
   
   return data.publicUrl;
 }
