@@ -79,7 +79,7 @@ Return as JSON with these fields:
   "estimatedDuration": 30
 }`;
 
-    // Call OpenAI API
+    // Call OpenAI API - use gpt-3.5-turbo for wider compatibility
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -87,11 +87,11 @@ Return as JSON with these fields:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert social media content creator specializing in viral short-form video scripts.',
+            content: 'You are an expert social media content creator specializing in viral short-form video scripts. Always respond with valid JSON.',
           },
           {
             role: 'user',

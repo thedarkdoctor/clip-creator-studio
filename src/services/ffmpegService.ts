@@ -12,6 +12,21 @@ let isLoading = false;
 let isReady = false;
 
 /**
+ * Convert FFmpeg file data to ArrayBuffer for Blob compatibility
+ * FFmpeg.wasm returns Uint8Array with potentially SharedArrayBuffer backing
+ */
+function toArrayBuffer(data: Uint8Array | string): ArrayBuffer {
+  if (typeof data === 'string') {
+    const encoder = new TextEncoder();
+    return encoder.encode(data).buffer as ArrayBuffer;
+  }
+  // Create a copy to ensure it's a regular ArrayBuffer, not SharedArrayBuffer
+  const copy = new Uint8Array(data.length);
+  copy.set(data);
+  return copy.buffer as ArrayBuffer;
+}
+
+/**
  * Initialize FFmpeg.wasm
  * Loads the FFmpeg core and wasm files
  */
@@ -108,13 +123,13 @@ export async function trimVideo(
     await ffmpeg.deleteFile('output.mp4');
 
     console.log('[FFmpeg] Trim complete');
-    return new Blob([data], { type: 'video/mp4' });
+    // Convert FileData to ArrayBuffer for Blob compatibility
+    return new Blob([toArrayBuffer(data as Uint8Array | string)], { type: 'video/mp4' });
   } catch (error) {
     console.error('[FFmpeg] Trim failed:', error);
     throw new Error('Failed to trim video');
   }
 }
-
 /**
  * Add text caption overlay to video
  */
@@ -168,7 +183,8 @@ export async function addCaptionOverlay(
     await ffmpeg.deleteFile('output.mp4');
 
     console.log('[FFmpeg] Caption overlay complete');
-    return new Blob([data], { type: 'video/mp4' });
+    // Convert FileData to ArrayBuffer for Blob compatibility
+    return new Blob([toArrayBuffer(data as Uint8Array | string)], { type: 'video/mp4' });
   } catch (error) {
     console.error('[FFmpeg] Caption overlay failed:', error);
     throw new Error('Failed to add caption overlay');
@@ -246,7 +262,11 @@ export async function mixAudioTracks(
     } else {
       // No audio mixing needed
       console.log('[FFmpeg] No audio tracks to mix');
-      return videoFile instanceof Blob ? videoFile : new Blob([await fetchFile(videoFile)], { type: 'video/mp4' });
+      if (videoFile instanceof Blob) {
+        return videoFile;
+      }
+      const fileData = await fetchFile(videoFile);
+      return new Blob([toArrayBuffer(fileData as Uint8Array | string)], { type: 'video/mp4' });
     }
 
     // Execute mixing command
@@ -262,13 +282,13 @@ export async function mixAudioTracks(
     await ffmpeg.deleteFile('output.mp4');
 
     console.log('[FFmpeg] Audio mixing complete');
-    return new Blob([data], { type: 'video/mp4' });
+    // Convert FileData to ArrayBuffer for Blob compatibility
+    return new Blob([toArrayBuffer(data as Uint8Array | string)], { type: 'video/mp4' });
   } catch (error) {
     console.error('[FFmpeg] Audio mixing failed:', error);
     throw new Error('Failed to mix audio tracks');
   }
 }
-
 /**
  * Get video duration and metadata
  */

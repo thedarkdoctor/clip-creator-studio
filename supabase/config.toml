@@ -35,3 +35,18 @@ verify_jwt = false
 
 [functions.marketing-intel]
 verify_jwt = false
+
+[functions.script-generation]
+verify_jwt = false
+
+[functions.stock-footage]
+verify_jwt = false
+
+[functions.elevenlabs-tts]
+verify_jwt = false
+
+[functions.background-music]
+verify_jwt = false
+
+[functions.buffer-publish-worker]
+verify_jwt = false

@@ -1,6 +1,8 @@
 // Supabase Edge Function: elevenlabs-tts
 // Generates voiceover audio using ElevenLabs Text-to-Speech
 
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY') || '';
 
 const CORS_HEADERS = {
@@ -29,8 +31,11 @@ Deno.serve(async (req) => {
     console.log('[ElevenLabs] Generating voiceover, text length:', text.length);
 
     if (!ELEVENLABS_API_KEY) {
+      console.error('[ElevenLabs] API key not configured');
       throw new Error('ElevenLabs API key not configured');
     }
+
+    console.log('[ElevenLabs] API key configured, calling ElevenLabs API...');
 
     // Call ElevenLabs API
     const response = await fetch(
@@ -64,8 +69,8 @@ Deno.serve(async (req) => {
 
     console.log('[ElevenLabs] Voiceover generated, size:', audioData.byteLength);
 
-    // Return audio data as base64 for easier handling
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+    // Use Deno's standard library for base64 encoding (prevents stack overflow)
+    const base64Audio = base64Encode(audioData);
 
     return new Response(
       JSON.stringify({
